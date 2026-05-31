@@ -1,0 +1,16 @@
+services:
+  fiscal-postgres:
+    image: postgres:16
+    container_name: erp-k2-fiscal-postgres
+    environment:
+      POSTGRES_USER: erp
+      POSTGRES_PASSWORD: erp
+      POSTGRES_DB: erp_fiscal
+    ports:
+      - "54322:5432"
+    volumes:
+      - fiscal_pg_data:/var/lib/postgresql/data
+
+volumes:
+  fiscal_pg_data:
+

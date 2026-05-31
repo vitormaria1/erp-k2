@@ -3,24 +3,47 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "dev:fiscal": "pglite-server --db=./data/fiscal-pgdata --host=127.0.0.1 --port=54323 --run \"npm run dev\"",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:init": "tsx scripts/init_db.ts",
+    "db:migrate": "tsx scripts/migrate_db.ts",
+    "fiscal:db:migrate": "tsx scripts/fiscal_migrate_pg.ts",
+    "fiscal:worker": "tsx scripts/fiscal_worker.ts",
+    "fiscal:seed": "tsx scripts/fiscal_seed.ts",
+    "fiscal:issue:xml": "tsx scripts/fiscal_issue_from_xml.ts",
+    "db:seed-customers-xml": "tsx scripts/seed_customers_from_nfe_xml.ts",
+    "fiscal:db:pglite": "pglite-server --db=./data/fiscal-pgdata --host=127.0.0.1 --port=54323",
+    "fiscal:db:up": "docker compose -f docker-compose.fiscal.yml up -d",
+    "fiscal:db:down": "docker compose -f docker-compose.fiscal.yml down",
+    "db:clean-products": "tsx scripts/clean_products.ts",
+    "db:reset": "rm -f data/erp.db && tsx scripts/init_db.ts && tsx scripts/clean_products.ts"
   },
   "dependencies": {
+    "better-sqlite3": "^12.10.0",
+    "@electric-sql/pglite": "^0.3.6",
+    "@electric-sql/pglite-socket": "^0.0.13",
+    "dotenv": "^16.6.1",
+    "fast-xml-parser": "^5.2.6",
     "next": "16.2.6",
+    "pg": "^8.16.3",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20",
+    "@types/pg": "^8.15.5",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "tailwindcss": "^4",
+    "tsx": "^4.20.5",
     "typescript": "^5"
   }
 }

@@ -1,36 +1,61 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+ERP da K2 Salgados (MVP)
 
-## Getting Started
+## O que já existe (MVP)
 
-First, run the development server:
+- Dashboard inspirado na imagem de referência
+- Importação de `produtos` e `clientes` a partir dos PDFs anexados
+- Estoque (ajuste manual de entrada/saída/ajuste)
+- Pedidos (lista + criação simples)
+- Financeiro (lista de recebíveis gerados ao criar pedido com preço)
+- Telas “em breve” para Produção, NF, Relatórios, Fornecedores e Configurações
+
+## Setup
+
+1) Instalar dependências
+
+```bash
+npm i
+```
+
+2) (Opcional) Re-extrair os PDFs para JSON
+
+```bash
+python3 scripts/extract_pdfs.py --products-pdf "/Users/vitormaria/Downloads/todos os produtos.pdf" --clients-pdf "/Users/vitormaria/Downloads/todos os clientes.pdf" --out-dir data
+```
+
+3) Inicializar o banco SQLite e importar os cadastros
+
+```bash
+npm run db:reset
+```
+
+4) Rodar em desenvolvimento
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Abrir `http://localhost:3000` no navegador.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Banco de dados
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Arquivo: `data/erp.db`
+- Config: `.env` com `DATABASE_PATH="data/erp.db"`
 
-## Learn More
+## Camada fiscal (PostgreSQL + Focus NFe)
 
-To learn more about Next.js, take a look at the following resources:
+- Config: `.env` com `FISCAL_DATABASE_URL="postgres://..."`
+- Postgres local:
+  - Sem Docker: `npm run fiscal:db:pglite` (porta `54323`)
+  - Com Docker: `npm run fiscal:db:up` (porta `54322`)
+- Migração: `npm run fiscal:db:migrate`
+- Emissão (homologação): `.env` com `FOCUS_NFE_ENV="homologacao"` e `FOCUS_NFE_TOKEN="..."`
+- Worker (fila/polling): `npm run fiscal:worker`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Próximos passos sugeridos
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Produtos: definir `kind` (INSUMO vs PRONTO), `min_stock`, preço/custo
+- Produção: fichas técnicas (BOM) e baixa automática de insumos
+- NF-e: integração emissor + armazenamento de XML/chave + vinculação ao pedido
+- Boletos: geração real (banco/PSP) + linha digitável/código de barras + PDF
+- Relatórios: vendas por período, produtos mais vendidos, financeiro/DRE

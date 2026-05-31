@@ -33,9 +33,23 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# local databases / state
+/data/*.db
+/data/*.db-*
+/data/*.sqlite*
+/data/fiscal-pgdata/
+
+# sensitive fiscal XML dumps (keep local)
+/NFes_*/
+
+# generated fiscal outputs (pdfs/previews) - keep local
+/public/fiscal/
+
 # vercel
 .vercel
 
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+/src/generated/prisma
