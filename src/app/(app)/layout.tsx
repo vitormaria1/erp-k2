@@ -2,6 +2,8 @@ import type { ReactNode } from "react";
 
 import { Sidebar } from "@/components/sidebar";
 
+export const dynamic = "force-dynamic";
+
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-full">
@@ -10,4 +12,3 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     </div>
   );
 }
-
