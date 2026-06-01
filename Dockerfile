@@ -27,6 +27,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN useradd -m -u 1001 nextjs
 
 COPY --from=builder /app/public ./public
+COPY --from=builder /app/db ./db
+COPY --from=builder /app/data ./seed-data
+COPY --from=builder /app/deploy ./deploy
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 
@@ -37,5 +40,4 @@ USER nextjs
 EXPOSE 3000
 ENV PORT=3000
 
-CMD ["node", "server.js"]
-
+CMD ["sh", "-lc", "node /app/deploy/init-db-runtime.mjs && node server.js"]
