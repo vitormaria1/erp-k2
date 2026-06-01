@@ -37,6 +37,36 @@ npm run dev
 
 Abrir `http://localhost:3000` no navegador.
 
+## Deploy na VPS (Docker)
+
+Pré-requisitos:
+- DNS `A` para `k2.varinteligencia.com` apontando para a VPS
+- Portas `80` e `443` liberadas (UFW / painel)
+
+Na VPS:
+
+```bash
+sudo apt update -y
+sudo apt install -y git docker.io docker-compose-plugin
+sudo systemctl enable --now docker
+
+sudo mkdir -p /opt/erp-k2
+sudo chown -R $USER:$USER /opt/erp-k2
+cd /opt/erp-k2
+
+git clone https://github.com/vitormaria1/erp-k2.git .
+
+# Banco (1ª vez) - ou copie seu erp.db atual para /opt/erp-k2/data/erp.db
+mkdir -p data
+npm ci
+npm run db:migrate
+
+docker compose up -d --build
+```
+
+HTTPS:
+- Recomendo iniciar Cloudflare em **DNS only** (cinza), emitir o certificado, depois voltar para **Proxied** (laranja).
+
 ## Banco de dados
 
 - Arquivo: `data/erp.db`
