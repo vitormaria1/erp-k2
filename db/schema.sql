@@ -21,6 +21,13 @@ CREATE TABLE IF NOT EXISTS customers (
   country_code TEXT,
   phone TEXT,
   email TEXT,
+  home_page TEXT,
+  tracks_orders INTEGER NOT NULL DEFAULT 0,
+  registered_at TEXT,
+  last_updated_at TEXT,
+  blocked INTEGER NOT NULL DEFAULT 0,
+  block_reason TEXT,
+  customer_type_code TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );

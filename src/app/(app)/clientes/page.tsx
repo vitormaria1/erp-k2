@@ -38,7 +38,7 @@ export default async function ClientesPage(props: { searchParams?: Promise<{ q?:
       </div>
 
       <div className="mt-5 overflow-x-auto rounded-2xl border bg-[var(--card)] shadow-sm">
-        <table className="min-w-[1600px] w-full text-sm">
+        <table className="min-w-[2200px] w-full text-sm">
           <thead className="bg-black/[0.02] text-left text-[var(--muted)]">
             <tr>
               <th className="px-4 py-3">Código</th>
@@ -59,6 +59,13 @@ export default async function ClientesPage(props: { searchParams?: Promise<{ q?:
               <th className="px-4 py-3">Cod. País</th>
               <th className="px-4 py-3">Telefone</th>
               <th className="px-4 py-3">E-mail</th>
+              <th className="px-4 py-3">Home page</th>
+              <th className="px-4 py-3">Acomp. pedidos</th>
+              <th className="px-4 py-3">Data cad.</th>
+              <th className="px-4 py-3">Última atualiz.</th>
+              <th className="px-4 py-3">Bloqueado</th>
+              <th className="px-4 py-3">Motivo bloqueio</th>
+              <th className="px-4 py-3">Cód. TP cad.</th>
               <th className="px-4 py-3">Ações</th>
             </tr>
           </thead>
@@ -83,6 +90,13 @@ export default async function ClientesPage(props: { searchParams?: Promise<{ q?:
                 <td className="px-4 py-3">{c.countryCode ?? "-"}</td>
                 <td className="px-4 py-3">{c.phone ?? "-"}</td>
                 <td className="px-4 py-3">{c.email ?? "-"}</td>
+                <td className="px-4 py-3">{c.homePage ?? "-"}</td>
+                <td className="px-4 py-3">{c.tracksOrders ? "Sim" : "Não"}</td>
+                <td className="px-4 py-3">{c.registeredAt ?? "-"}</td>
+                <td className="px-4 py-3">{c.lastUpdatedAt ?? "-"}</td>
+                <td className="px-4 py-3">{c.blocked ? "Sim" : "Não"}</td>
+                <td className="px-4 py-3">{c.blockReason ?? "-"}</td>
+                <td className="px-4 py-3">{c.customerTypeCode ?? "-"}</td>
                 <td className="px-4 py-3">
                   <Link
                     href={`/clientes/${c.id}/editar`}
@@ -95,7 +109,7 @@ export default async function ClientesPage(props: { searchParams?: Promise<{ q?:
             ))}
             {rows.length === 0 ? (
               <tr>
-                <td className="px-4 py-8 text-[var(--muted)]" colSpan={19}>
+                <td className="px-4 py-8 text-[var(--muted)]" colSpan={26}>
                   Nenhum cliente encontrado.
                 </td>
               </tr>

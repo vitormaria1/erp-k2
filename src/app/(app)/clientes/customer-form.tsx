@@ -39,6 +39,14 @@ const addressFields: Field[] = [
 const contactFields: Field[] = [
   { name: "phone", label: "Telefone" },
   { name: "email", label: "E-mail" },
+  { name: "homePage", label: "Home page" },
+];
+
+const controlFields: Field[] = [
+  { name: "registeredAt", label: "Data cadastro" },
+  { name: "lastUpdatedAt", label: "Última atualização" },
+  { name: "blockReason", label: "Motivo bloqueio" },
+  { name: "customerTypeCode", label: "Cód. tipo cadastro" },
 ];
 
 function TextField({ field, customer }: { field: Field; customer?: CustomerRow }) {
@@ -99,6 +107,30 @@ export function CustomerForm({ action, customer, submitLabel }: CustomerFormProp
         {contactFields.map((field) => (
           <TextField key={field.name} field={field} customer={customer} />
         ))}
+      </Fieldset>
+
+      <Fieldset title="Controle do cadastro">
+        {controlFields.map((field) => (
+          <TextField key={field.name} field={field} customer={customer} />
+        ))}
+        <label className="flex items-center gap-3 rounded-xl border bg-[var(--card)] px-4 py-3 text-sm md:mt-6">
+          <input
+            name="tracksOrders"
+            type="checkbox"
+            defaultChecked={Boolean(customer?.tracksOrders)}
+            className="h-4 w-4"
+          />
+          <span>Acompanha pedidos</span>
+        </label>
+        <label className="flex items-center gap-3 rounded-xl border bg-[var(--card)] px-4 py-3 text-sm md:mt-6">
+          <input
+            name="blocked"
+            type="checkbox"
+            defaultChecked={Boolean(customer?.blocked)}
+            className="h-4 w-4"
+          />
+          <span>Bloqueado</span>
+        </label>
       </Fieldset>
 
       <div className="flex flex-wrap gap-2">

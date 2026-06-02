@@ -36,6 +36,13 @@ const customerSchema = z.object({
   countryCode: optionalText,
   phone: optionalText,
   email: optionalText,
+  homePage: optionalText,
+  tracksOrders: z.coerce.boolean().default(false),
+  registeredAt: optionalText,
+  lastUpdatedAt: optionalText,
+  blocked: z.coerce.boolean().default(false),
+  blockReason: optionalText,
+  customerTypeCode: optionalText,
 });
 
 function parseCustomerForm(formData: FormData) {
@@ -59,6 +66,13 @@ function parseCustomerForm(formData: FormData) {
     countryCode: formData.get("countryCode")?.toString(),
     phone: formData.get("phone")?.toString(),
     email: formData.get("email")?.toString(),
+    homePage: formData.get("homePage")?.toString(),
+    tracksOrders: formData.get("tracksOrders") === "on",
+    registeredAt: formData.get("registeredAt")?.toString(),
+    lastUpdatedAt: formData.get("lastUpdatedAt")?.toString(),
+    blocked: formData.get("blocked") === "on",
+    blockReason: formData.get("blockReason")?.toString(),
+    customerTypeCode: formData.get("customerTypeCode")?.toString(),
   });
 }
 
@@ -83,12 +97,14 @@ export async function createCustomerAction(formData: FormData) {
       INSERT INTO customers (
         id, code, cnpj, state_tax_id, taxpayer, name, trade_name, cep,
         street, number, complement, neighborhood, city, uf, city_code,
-        country, country_code, phone, email, updated_at
+        country, country_code, phone, email, home_page, tracks_orders,
+        registered_at, last_updated_at, blocked, block_reason, customer_type_code, updated_at
       )
       VALUES (
         @id, @code, @cnpj, @state_tax_id, @taxpayer, @name, @trade_name, @cep,
         @street, @number, @complement, @neighborhood, @city, @uf, @city_code,
-        @country, @country_code, @phone, @email, datetime('now')
+        @country, @country_code, @phone, @email, @home_page, @tracks_orders,
+        @registered_at, @last_updated_at, @blocked, @block_reason, @customer_type_code, datetime('now')
       )
     `
   ).run({
@@ -111,6 +127,13 @@ export async function createCustomerAction(formData: FormData) {
     country_code: parsed.countryCode,
     phone: parsed.phone,
     email: parsed.email,
+    home_page: parsed.homePage,
+    tracks_orders: parsed.tracksOrders ? 1 : 0,
+    registered_at: parsed.registeredAt,
+    last_updated_at: parsed.lastUpdatedAt,
+    blocked: parsed.blocked ? 1 : 0,
+    block_reason: parsed.blockReason,
+    customer_type_code: parsed.customerTypeCode,
   });
 
   revalidatePath("/clientes");
@@ -145,6 +168,13 @@ export async function updateCustomerAction(formData: FormData) {
           country_code=@country_code,
           phone=@phone,
           email=@email,
+          home_page=@home_page,
+          tracks_orders=@tracks_orders,
+          registered_at=@registered_at,
+          last_updated_at=@last_updated_at,
+          blocked=@blocked,
+          block_reason=@block_reason,
+          customer_type_code=@customer_type_code,
           updated_at=datetime('now')
         WHERE id=@id
       `
@@ -169,6 +199,13 @@ export async function updateCustomerAction(formData: FormData) {
       country_code: parsed.countryCode,
       phone: parsed.phone,
       email: parsed.email,
+      home_page: parsed.homePage,
+      tracks_orders: parsed.tracksOrders ? 1 : 0,
+      registered_at: parsed.registeredAt,
+      last_updated_at: parsed.lastUpdatedAt,
+      blocked: parsed.blocked ? 1 : 0,
+      block_reason: parsed.blockReason,
+      customer_type_code: parsed.customerTypeCode,
     });
 
   if (result.changes === 0) throw new Error("Cliente não encontrado.");

@@ -44,6 +44,13 @@ export type CustomerRow = {
   countryCode: string | null;
   phone: string | null;
   email: string | null;
+  homePage: string | null;
+  tracksOrders: number;
+  registeredAt: string | null;
+  lastUpdatedAt: string | null;
+  blocked: number;
+  blockReason: string | null;
+  customerTypeCode: string | null;
 };
 
 export type ProductRow = {
@@ -146,7 +153,14 @@ const customerSelect = `
     country,
     country_code as countryCode,
     phone,
-    email
+    email,
+    home_page as homePage,
+    tracks_orders as tracksOrders,
+    registered_at as registeredAt,
+    last_updated_at as lastUpdatedAt,
+    blocked,
+    block_reason as blockReason,
+    customer_type_code as customerTypeCode
   FROM customers
 `;
 
@@ -165,12 +179,16 @@ export function listCustomers(opts: { q?: string; limit?: number } = {}): Custom
       ${customerSelect}
       WHERE
         name LIKE ? OR trade_name LIKE ? OR code LIKE ? OR cnpj LIKE ? OR
-        cep LIKE ? OR city LIKE ? OR phone LIKE ? OR email LIKE ?
+        cep LIKE ? OR city LIKE ? OR phone LIKE ? OR email LIKE ? OR
+        home_page LIKE ? OR block_reason LIKE ? OR customer_type_code LIKE ?
       ORDER BY CAST(code AS INTEGER) ASC, code ASC
       LIMIT ?
     `
     )
     .all(
+      `%${q}%`,
+      `%${q}%`,
+      `%${q}%`,
       `%${q}%`,
       `%${q}%`,
       `%${q}%`,

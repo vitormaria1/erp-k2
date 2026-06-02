@@ -48,6 +48,11 @@ function readField(row: ClientRow, aliases: string[]): string | undefined {
   return undefined;
 }
 
+function yesNoFlag(value: string | undefined): number {
+  const normalized = normalizeHeader(value ?? "");
+  return ["s", "sim", "y", "yes", "true", "1"].includes(normalized) ? 1 : 0;
+}
+
 function sanitizeReference(raw: string | undefined): string | null {
   const v = (raw ?? "").trim();
   if (!v) return null;
@@ -83,12 +88,14 @@ async function main() {
     INSERT INTO customers (
       id, code, cnpj, state_tax_id, taxpayer, name, trade_name, cep,
       street, number, complement, neighborhood, city, uf, city_code,
-      country, country_code, phone, email, updated_at
+      country, country_code, phone, email, home_page, tracks_orders,
+      registered_at, last_updated_at, blocked, block_reason, customer_type_code, updated_at
     )
     VALUES (
       @id, @code, @cnpj, @state_tax_id, @taxpayer, @name, @trade_name, @cep,
       @street, @number, @complement, @neighborhood, @city, @uf, @city_code,
-      @country, @country_code, @phone, @email, datetime('now')
+      @country, @country_code, @phone, @email, @home_page, @tracks_orders,
+      @registered_at, @last_updated_at, @blocked, @block_reason, @customer_type_code, datetime('now')
     )
     ON CONFLICT(code) DO UPDATE SET
       cnpj=excluded.cnpj,
@@ -108,6 +115,13 @@ async function main() {
       country_code=excluded.country_code,
       phone=excluded.phone,
       email=excluded.email,
+      home_page=excluded.home_page,
+      tracks_orders=excluded.tracks_orders,
+      registered_at=excluded.registered_at,
+      last_updated_at=excluded.last_updated_at,
+      blocked=excluded.blocked,
+      block_reason=excluded.block_reason,
+      customer_type_code=excluded.customer_type_code,
       updated_at=datetime('now')
   `);
 
@@ -136,26 +150,28 @@ async function main() {
         code,
         cnpj: nonEmptyOrNull(readField(c, ["CNPJ", "CPF/CNPJ", "CPF CNPJ", "CPF"])),
         state_tax_id: nonEmptyOrNull(readField(c, ["Inscr. Estadual", "Inscrição Estadual", "IE"])),
-        taxpayer:
-          (readField(c, ["Contribuinte S/N", "Contribuinte", "Contribuinte SN"]) ?? "")
-            .trim()
-            .toUpperCase() === "S"
-            ? 1
-            : 0,
+        taxpayer: yesNoFlag(readField(c, ["Contribuinte S/N", "Contribuinte", "Contribuinte SN"])),
         name: (readField(c, ["Nome", "Razão Social", "Razao Social"]) ?? "").trim() || code,
         trade_name: nonEmptyOrNull(readField(c, ["Nome Fantasia", "Fantasia"])),
         cep: nonEmptyOrNull(readField(c, ["CEP", "Cep"])),
         street: nonEmptyOrNull(readField(c, ["Endereço", "Endereco", "Logradouro", "Rua"])),
-        number: nonEmptyOrNull(readField(c, ["Número", "Numero", "Nº", "Nr.", "Nro"])),
+        number: nonEmptyOrNull(readField(c, ["Número", "Numero", "Numero End.", "Número End.", "Nº", "Nr.", "Nro"])),
         complement: nonEmptyOrNull(readField(c, ["Complemento", "Compl."])),
         neighborhood: nonEmptyOrNull(readField(c, ["Bairro"])),
         city: nonEmptyOrNull(readField(c, ["Cidade", "Município", "Municipio"])),
         uf: nonEmptyOrNull(readField(c, ["UF", "Estado"])),
-        city_code: nonEmptyOrNull(readField(c, ["Cod.Mun", "Cod. Município", "Código Município", "Codigo Municipio", "cMun"])),
+        city_code: nonEmptyOrNull(readField(c, ["Cod.Cidade", "Cod.Mun", "Cod. Município", "Código Município", "Codigo Municipio", "cMun"])),
         country: nonEmptyOrNull(readField(c, ["País", "Pais", "País Nome", "Pais Nome", "xPais"])),
         country_code: nonEmptyOrNull(readField(c, ["Cod.País", "Cod.Pais", "Código País", "Codigo Pais", "cPais"])),
         phone: nonEmptyOrNull(readField(c, ["Fone", "Telefone", "Celular", "Phone"])),
-        email: nonEmptyOrNull(readField(c, ["E-mail", "Email"])),
+        email: nonEmptyOrNull(readField(c, ["e-mail", "E-mail", "Email"])),
+        home_page: nonEmptyOrNull(readField(c, ["Home Page", "Homepage", "Site"])),
+        tracks_orders: yesNoFlag(readField(c, ["Acompanha Pedidos?", "Acompanha Pedidos", "Acompanha Pedido"])),
+        registered_at: nonEmptyOrNull(readField(c, ["Data Cad.", "Data Cadastro", "Data Cad", "Cadastro Em"])),
+        last_updated_at: nonEmptyOrNull(readField(c, ["Ultima Atualiz.", "Última Atualiz.", "Ultima Atualizacao", "Última Atualização"])),
+        blocked: yesNoFlag(readField(c, ["Bloqueado?", "Bloqueado"])),
+        block_reason: nonEmptyOrNull(readField(c, ["Motivo Bloqueio", "Motivo Bloqueado"])),
+        customer_type_code: nonEmptyOrNull(readField(c, ["Cod.TP Cad.", "Cod TP Cad", "Código Tipo Cadastro", "Codigo Tipo Cadastro"])),
       });
     }
 

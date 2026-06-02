@@ -138,6 +138,7 @@ def extract_customer_tables_by_key(pdf_path: Path, key_header: str = "Cod.Cadast
     merged_by_key: dict[str, dict[str, str]] = {}
     order: list[str] = []
     current_headers: list[str] | None = None
+    current_keys: list[str] = []
     key_norm = _normalize_header(key_header)
 
     def register_headers(headers: list[str]) -> list[str]:
@@ -174,8 +175,10 @@ def extract_customer_tables_by_key(pdf_path: Path, key_header: str = "Cod.Cadast
             (idx for idx, header in enumerate(current_headers) if _normalize_header(header) == key_norm),
             None,
         )
+        keyed_segment = key_index is not None
+        next_keys: list[str] = []
 
-        for row in data_rows:
+        for row_index, row in enumerate(data_rows):
             values = [_normalize_cell(c) for c in row]
             if not any(values):
                 continue
@@ -183,8 +186,14 @@ def extract_customer_tables_by_key(pdf_path: Path, key_header: str = "Cod.Cadast
                 continue
 
             key = values[key_index].strip() if key_index is not None and key_index < len(values) else ""
-            if not key:
-                # Without the registration code we cannot safely stitch a horizontal table segment.
+            if key:
+                next_keys.append(key)
+            elif row_index < len(current_keys):
+                # Some ERP reports split one customer group horizontally across pages.
+                # Continuation pages often omit Cod.Cadastro; stitch them by row order
+                # using the keys captured from the most recent keyed segment.
+                key = current_keys[row_index]
+            else:
                 continue
 
             if key not in merged_by_key:
@@ -201,6 +210,9 @@ def extract_customer_tables_by_key(pdf_path: Path, key_header: str = "Cod.Cadast
                     record[header] = value
                 elif value not in previous.split(" | "):
                     record[header] = f"{previous} | {value}"
+
+        if keyed_segment and next_keys:
+            current_keys = next_keys
 
     if not all_headers:
         raise RuntimeError(f"No customer table headers found in {pdf_path}")
