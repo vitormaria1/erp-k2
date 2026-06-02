@@ -27,10 +27,23 @@ export type LowStockItem = {
 export type CustomerRow = {
   id: string;
   code: string;
+  cnpj: string | null;
+  stateTaxId: string | null;
+  taxpayer: number;
   name: string;
   tradeName: string | null;
-  cnpj: string | null;
   cep: string | null;
+  street: string | null;
+  number: string | null;
+  complement: string | null;
+  neighborhood: string | null;
+  city: string | null;
+  uf: string | null;
+  cityCode: string | null;
+  country: string | null;
+  countryCode: string | null;
+  phone: string | null;
+  email: string | null;
 };
 
 export type ProductRow = {
@@ -112,28 +125,67 @@ export function listLowStock(limit = 6): LowStockItem[] {
     .all(limit) as LowStockItem[];
 }
 
+
+const customerSelect = `
+  SELECT
+    id,
+    code,
+    cnpj,
+    state_tax_id as stateTaxId,
+    taxpayer,
+    name,
+    trade_name as tradeName,
+    cep,
+    street,
+    number,
+    complement,
+    neighborhood,
+    city,
+    uf,
+    city_code as cityCode,
+    country,
+    country_code as countryCode,
+    phone,
+    email
+  FROM customers
+`;
+
 export function listCustomers(opts: { q?: string; limit?: number } = {}): CustomerRow[] {
   const db = getDb();
   const q = (opts.q ?? "").trim();
   const limit = opts.limit ?? 50;
   if (!q) {
     return db
-      .prepare(
-        "SELECT id, code, name, trade_name as tradeName, cnpj, cep FROM customers ORDER BY name LIMIT ?"
-      )
+      .prepare(`${customerSelect} ORDER BY CAST(code AS INTEGER) ASC, code ASC LIMIT ?`)
       .all(limit) as CustomerRow[];
   }
   return db
     .prepare(
       `
-      SELECT id, code, name, trade_name as tradeName, cnpj, cep
-      FROM customers
-      WHERE name LIKE ? OR trade_name LIKE ? OR code LIKE ? OR cnpj LIKE ?
-      ORDER BY name
+      ${customerSelect}
+      WHERE
+        name LIKE ? OR trade_name LIKE ? OR code LIKE ? OR cnpj LIKE ? OR
+        cep LIKE ? OR city LIKE ? OR phone LIKE ? OR email LIKE ?
+      ORDER BY CAST(code AS INTEGER) ASC, code ASC
       LIMIT ?
     `
     )
-    .all(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, limit) as CustomerRow[];
+    .all(
+      `%${q}%`,
+      `%${q}%`,
+      `%${q}%`,
+      `%${q}%`,
+      `%${q}%`,
+      `%${q}%`,
+      `%${q}%`,
+      `%${q}%`,
+      limit
+    ) as CustomerRow[];
+}
+
+export function getCustomerById(id: string): CustomerRow | null {
+  const db = getDb();
+  return (db.prepare(`${customerSelect} WHERE id = ?`).get(id) as CustomerRow | undefined) ?? null;
 }
 
 export function listProducts(opts: { q?: string; limit?: number } = {}): ProductRow[] {
