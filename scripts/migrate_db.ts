@@ -37,6 +37,13 @@ async function main() {
   ensureColumn(db, "customers", "country_code", "TEXT");
   ensureColumn(db, "customers", "phone", "TEXT");
   ensureColumn(db, "customers", "email", "TEXT");
+  ensureColumn(db, "customers", "home_page", "TEXT");
+  ensureColumn(db, "customers", "tracks_orders", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "customers", "registered_at", "TEXT");
+  ensureColumn(db, "customers", "last_updated_at", "TEXT");
+  ensureColumn(db, "customers", "blocked", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "customers", "block_reason", "TEXT");
+  ensureColumn(db, "customers", "customer_type_code", "TEXT");
 
   // Backfill columns for stock_movements
   ensureColumn(db, "stock_movements", "unit_cost", "REAL");
