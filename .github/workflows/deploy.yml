@@ -3,7 +3,16 @@ name: Deploy VPS
 on:
   push:
     branches: [main]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      reset_sqlite_db:
+        description: "Backup and recreate the production SQLite DB from the current seed data"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
 
 concurrency:
   group: deploy-vps-main
@@ -24,6 +33,17 @@ jobs:
             set -euo pipefail
             cd /opt/erp-k2
             git pull --ff-only
+
+            RESET_SQLITE_DB="${{ github.event_name == 'workflow_dispatch' && inputs.reset_sqlite_db || 'false' }}"
+            if [ "$RESET_SQLITE_DB" = "true" ]; then
+              echo "Resetting production SQLite database after backup..."
+              docker compose down
+              mkdir -p data
+              if [ -f data/erp.db ]; then
+                cp data/erp.db "data/erp.db.backup-$(date +%Y%m%d-%H%M%S)"
+              fi
+              rm -f data/erp.db data/erp.db-*
+            fi
+
             docker compose up -d --build
             docker ps
-
