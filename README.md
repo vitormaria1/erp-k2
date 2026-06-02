@@ -19,9 +19,37 @@ npm i
 
 2) (Opcional) Re-extrair os PDFs para JSON
 
+Antes de extrair os PDFs, instale as dependências Python:
+
+```bash
+python3 -m pip install -r requirements.txt
+```
+
+Se o arquivo `requirements.txt` ainda não existir na sua branch/Codespace, instale a biblioteca diretamente:
+
+```bash
+python3 -m pip install pdfplumber
+```
+
+Para atualizar somente a lista de clientes a partir do PDF:
+
+```bash
+python3 scripts/extract_pdfs.py --clients-pdf "todos os clientes (1).pdf" --out-dir data
+```
+
+Se esse comando responder que `--products-pdf` é obrigatório, o Codespace ainda está com uma versão antiga do script. Atualize a branch antes de tentar novamente:
+
+```bash
+git pull
+```
+
+Para re-extrair produtos e clientes juntos:
+
 ```bash
 python3 scripts/extract_pdfs.py --products-pdf "/Users/vitormaria/Downloads/todos os produtos.pdf" --clients-pdf "/Users/vitormaria/Downloads/todos os clientes.pdf" --out-dir data
 ```
+
+> Atenção: se o PDF tiver dados pessoais de clientes e o repositório estiver público, remova o PDF do GitHub depois de gerar os arquivos JSON.
 
 3) Inicializar o banco SQLite e importar os cadastros
 
