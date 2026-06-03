@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { getDb } from "@/lib/db";
+import { getConfiguredFocusAmbiente } from "@/fiscal/providers/focus";
 type Row = {
   id: number;
   createdAt: string;
@@ -62,6 +63,10 @@ function listOrders(limit = 50): Row[] {
 
 export default function PedidosPage() {
   const orders = listOrders();
+  const ambiente = getConfiguredFocusAmbiente();
+  const fiscalLabel = ambiente === "producao" ? "P" : "H";
+  const fiscalTitle =
+    ambiente === "producao" ? "Emite NF-e em produção (usa Focus)" : "Emite NF-e em homologação (usa Focus)";
   return (
     <div className="mx-auto max-w-6xl px-6 py-6">
       <div className="flex items-end justify-between">
@@ -116,13 +121,9 @@ export default function PedidosPage() {
                       <button
                         className="rounded-lg bg-black px-3 py-1.5 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
                         disabled={!o.customerAddressOk}
-                        title={
-                          o.customerAddressOk
-                            ? "Emite NF-e em homologação (usa Focus)"
-                            : "Cliente sem endereço completo (logradouro/número/bairro/cidade/UF/CEP)"
-                        }
+                        title={o.customerAddressOk ? fiscalTitle : "Cliente sem endereço completo (logradouro/número/bairro/cidade/UF/CEP)"}
                       >
-                        Emitir NF-e (H)
+                        Emitir NF-e ({fiscalLabel})
                       </button>
                     </form>
                   </div>

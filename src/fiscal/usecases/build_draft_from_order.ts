@@ -2,10 +2,11 @@ import { randomUUID } from "node:crypto";
 
 import { getDb } from "../../lib/db";
 import { getIssuerConfig } from "../config/issuer";
-import { getNfeDefaults } from "../config/nfe_defaults";
+import { getNfeDefaults, pickNfeDefaultsByAmbiente } from "../config/nfe_defaults";
 import { getFiscalDbPool } from "../infra/pg";
 import { ProductFiscalDataRepositoryPg } from "../persistence/pg";
 import { FiscalValidationError } from "../engine/errors";
+import { getConfiguredFocusAmbiente } from "../providers/focus";
 
 function onlyDigits(v: string | null | undefined) {
   return String(v ?? "").replace(/[^\d]/g, "");
@@ -101,7 +102,7 @@ export async function buildFiscalDraftFromOrder(orderId: number) {
   if (!items.length) throw new Error("Pedido sem itens");
 
   const issuer = getIssuerConfig();
-  const defaults = getNfeDefaults();
+  const defaults = pickNfeDefaultsByAmbiente(getNfeDefaults(), getConfiguredFocusAmbiente());
   const pool = getFiscalDbPool();
   const productFiscalRepo = new ProductFiscalDataRepositoryPg(pool);
 
@@ -149,7 +150,7 @@ export async function buildFiscalDraftFromOrder(orderId: number) {
 
   const draft = {
     model: 55 as const,
-    serie: defaults.serieHomolog,
+    serie: defaults.serie,
 
     issuer: {
       cnpj: issuer.cnpj,
@@ -206,7 +207,7 @@ export async function buildFiscalDraftFromOrder(orderId: number) {
   const serieNum = Number(draft.serie);
   if (Number.isFinite(serieNum) && serieNum >= 900) {
     throw new FiscalValidationError(
-      `Série ${draft.serie} inválida para emissão normal: séries 900+ costumam ser reservadas para contingência e podem causar rejeição 244. Use série 1 em homologação.`,
+      `Série ${draft.serie} inválida para emissão normal: séries 900+ costumam ser reservadas para contingência e podem causar rejeição 244. Use uma série regular (por exemplo, 99 em homologação ou 1 em produção).`,
       { orderId, customerId: order.customerId }
     );
   }

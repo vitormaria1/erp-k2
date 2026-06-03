@@ -1,18 +1,9 @@
-import { readdir } from "node:fs/promises";
-import path from "node:path";
-
 import { getFiscalDbPool } from "@/fiscal/infra/pg";
 import { listFiscalInvoices } from "@/fiscal/persistence/pg/dashboard_queries";
 
-import { issueFromXmlFileAction, previewDanfeFromXmlFileAction, seedFromXmlDirAction } from "./actions";
+import { seedFromXmlDirAction } from "./actions";
 import { FiscalInlineWorkerClient } from "./inline_worker_client";
 import Link from "next/link";
-
-async function listXmlFiles(dir: string) {
-  const abs = path.isAbsolute(dir) ? dir : path.join(process.cwd(), dir);
-  const files = (await readdir(abs)).filter((f) => f.toLowerCase().endsWith(".xml")).sort();
-  return files.map((f) => path.join(abs, f));
-}
 
 export const dynamic = "force-dynamic";
 
@@ -32,9 +23,6 @@ async function getInvoiceById(id: string) {
 }
 
 export default async function NotaFiscalPage(props: { searchParams?: Promise<Record<string, string | string[]>> }) {
-  const xmlDir = "NFes_09572986000149_01052026a26052026";
-  const xmlFiles = await listXmlFiles(xmlDir).catch(() => []);
-
   const searchParams: Record<string, string | string[]> =
     (await props.searchParams?.catch(() => ({} as Record<string, string | string[]>))) ?? {};
   const invoiceIdParam = searchParams.invoiceId;
@@ -136,7 +124,7 @@ export default async function NotaFiscalPage(props: { searchParams?: Promise<Rec
               <label className="text-xs text-[var(--muted)]">Pasta de XMLs</label>
               <input
                 name="xmlDir"
-                defaultValue={xmlDir}
+                defaultValue="NFes_09572986000149_01052026a26052026"
                 className="mt-1 w-full rounded-xl border bg-transparent px-3 py-2 text-sm"
               />
             </div>
@@ -146,62 +134,6 @@ export default async function NotaFiscalPage(props: { searchParams?: Promise<Rec
           </form>
           <div className="mt-3 text-xs text-[var(--muted)]">
             Pré-requisitos: `npm run fiscal:db:up` + `npm run fiscal:db:migrate`
-          </div>
-        </div>
-
-        <div className="rounded-2xl border bg-[var(--card)] p-5">
-          <div className="text-sm font-semibold">2) Emitir NF-e (homologação) usando um XML como base</div>
-          <div className="mt-1 text-xs text-[var(--muted)]">
-            Reaproveita operação REAL (natOp/CFOP/CSTs) e dispara emissão via Focus em homologação.
-          </div>
-          <form action={previewDanfeFromXmlFileAction} className="mt-3 flex items-end gap-2">
-            <div className="flex-1">
-              <label className="text-xs text-[var(--muted)]">XML</label>
-              <select
-                name="xmlFile"
-                className="mt-1 w-full rounded-xl border bg-transparent px-3 py-2 text-sm"
-                defaultValue={xmlFiles[0] ?? ""}
-              >
-                {xmlFiles.length === 0 ? (
-                  <option value="">Nenhum XML encontrado</option>
-                ) : (
-                  xmlFiles.map((f) => (
-                    <option key={f} value={f}>
-                      {path.basename(f)}
-                    </option>
-                  ))
-                )}
-              </select>
-            </div>
-            <button className="rounded-xl border px-4 py-2 text-sm font-medium">
-              Preview DANFE
-            </button>
-          </form>
-          <form action={issueFromXmlFileAction} className="mt-2 flex items-end gap-2">
-            <div className="flex-1">
-              <label className="text-xs text-[var(--muted)]">XML</label>
-              <select
-                name="xmlFile"
-                className="mt-1 w-full rounded-xl border bg-transparent px-3 py-2 text-sm"
-                defaultValue={xmlFiles[0] ?? ""}
-              >
-                {xmlFiles.length === 0 ? (
-                  <option value="">Nenhum XML encontrado</option>
-                ) : (
-                  xmlFiles.map((f) => (
-                    <option key={f} value={f}>
-                      {path.basename(f)}
-                    </option>
-                  ))
-                )}
-              </select>
-            </div>
-            <button className="rounded-xl bg-black px-4 py-2 text-sm font-medium text-white">
-              Emitir (homologação)
-            </button>
-          </form>
-          <div className="mt-3 text-xs text-[var(--muted)]">
-            Emissão síncrona (local). Se preferir fila/worker depois, mantém a estrutura pronta.
           </div>
         </div>
       </div>

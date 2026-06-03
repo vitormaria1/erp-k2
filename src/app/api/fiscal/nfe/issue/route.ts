@@ -1,4 +1,4 @@
-import { issueNfeHomologacao } from "../../../../../fiscal/usecases/issue_nfe";
+import { issueNfe } from "../../../../../fiscal/usecases/issue_nfe";
 
 function assertInternalAuth(req: Request) {
   const required = (process.env.INTERNAL_API_TOKEN ?? "").trim();
@@ -18,10 +18,9 @@ export async function POST(req: Request) {
   if (authErr) return authErr;
 
   const body = await req.json();
-  const result = await issueNfeHomologacao(body);
+  const result = await issueNfe(body);
   return new Response(JSON.stringify(result), {
     status: 200,
     headers: { "content-type": "application/json" },
   });
 }
-

@@ -1,8 +1,8 @@
 import { getFiscalDbPool } from "../infra/pg";
 import { withPgTx } from "../persistence/pg/tx";
 import { FiscalEngine, NoopTaxRuleEngine } from "../engine";
-import { FocusNFeClient, FocusNFePayloadBuilder } from "../providers/focus";
-import { getNfeDefaults } from "../config/nfe_defaults";
+import { FocusNFeClient, FocusNFePayloadBuilder, getFocusEnv } from "../providers/focus";
+import { getNfeDefaults, pickNfeDefaultsByAmbiente } from "../config/nfe_defaults";
 import {
   FiscalInvoiceRepositoryPg,
   FiscalJobRepositoryPg,
@@ -23,9 +23,10 @@ function buildFocusRef(args: { issuerCnpj: string; serie: string; numero: number
   return `${args.issuerCnpj}_NFE_${args.serie}_${String(args.numero).padStart(9, "0")}`;
 }
 
-export async function issueNfeHomologacao(input: unknown): Promise<IssueNfeResult> {
+export async function issueNfe(input: unknown): Promise<IssueNfeResult> {
   const pool = getFiscalDbPool();
-  const defaults = getNfeDefaults();
+  const { ambiente } = getFocusEnv();
+  const defaults = pickNfeDefaultsByAmbiente(getNfeDefaults(), ambiente);
 
   const productFiscalDataRepo = new ProductFiscalDataRepositoryPg(pool);
   const fiscalProfileRepo = new FiscalProfileRepositoryPg(pool);
@@ -53,7 +54,7 @@ export async function issueNfeHomologacao(input: unknown): Promise<IssueNfeResul
       issuerCnpj: draft.issuer.cnpj,
       model: draft.model,
       serie: draft.serie,
-      startAt: defaults.startNumberHomolog,
+      startAt: defaults.startNumber,
     });
     const focusRef = buildFocusRef({ issuerCnpj: draft.issuer.cnpj, serie: draft.serie, numero });
 
@@ -74,7 +75,7 @@ export async function issueNfeHomologacao(input: unknown): Promise<IssueNfeResul
     await jobRepo.enqueue({
       client,
       kind: "ISSUE_NFE",
-      payload: { invoiceId: invoice.id, focusRef, payload, ambiente: "homologacao" },
+      payload: { invoiceId: invoice.id, focusRef, payload, ambiente },
       invoiceId: invoice.id,
     });
 
@@ -83,4 +84,8 @@ export async function issueNfeHomologacao(input: unknown): Promise<IssueNfeResul
 
     return { invoiceId: invoice.id, focusRef, serie: draft.serie, numero };
   });
+}
+
+export async function issueNfeHomologacao(input: unknown): Promise<IssueNfeResult> {
+  return issueNfe(input);
 }

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Ambiente } from "../domain/enums";
 
 const EnvSchema = z.object({
   // Em homologação, use uma série "normal" (ex: 1 ou 99). Séries 900+ costumam ser reservadas para contingência e podem gerar rejeição 244.
@@ -11,6 +12,14 @@ const EnvSchema = z.object({
     .transform((v) => Number(v))
     .pipe(z.number().int().positive())
     .default(1000),
+  FISCAL_NFE_SERIE_PROD: z.string().trim().min(1).max(3).default("1"),
+  FISCAL_NFE_START_NUMBER_PROD: z
+    .string()
+    .trim()
+    .regex(/^\d+$/)
+    .transform((v) => Number(v))
+    .pipe(z.number().int().positive())
+    .default(1),
   FISCAL_DEFAULT_OPERATION_CODE: z.string().trim().min(2).default("VENDA_INTERNA"),
   FISCAL_DEFAULT_PROFILE_CODE: z.string().trim().min(2).default("PRODUCAO_PROPRIA"),
 });
@@ -20,7 +29,28 @@ export function getNfeDefaults() {
   return {
     serieHomolog: parsed.FISCAL_NFE_SERIE_HOMOLOG,
     startNumberHomolog: parsed.FISCAL_NFE_START_NUMBER_HOMOLOG,
+    serieProducao: parsed.FISCAL_NFE_SERIE_PROD,
+    startNumberProducao: parsed.FISCAL_NFE_START_NUMBER_PROD,
     defaultOperationCode: parsed.FISCAL_DEFAULT_OPERATION_CODE,
     defaultProfileCode: parsed.FISCAL_DEFAULT_PROFILE_CODE,
   };
+}
+
+export function pickNfeDefaultsByAmbiente(
+  defaults: ReturnType<typeof getNfeDefaults>,
+  ambiente: Ambiente
+) {
+  return ambiente === "producao"
+    ? {
+        serie: defaults.serieProducao,
+        startNumber: defaults.startNumberProducao,
+        defaultOperationCode: defaults.defaultOperationCode,
+        defaultProfileCode: defaults.defaultProfileCode,
+      }
+    : {
+        serie: defaults.serieHomolog,
+        startNumber: defaults.startNumberHomolog,
+        defaultOperationCode: defaults.defaultOperationCode,
+        defaultProfileCode: defaults.defaultProfileCode,
+      };
 }

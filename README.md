@@ -112,9 +112,16 @@ HTTPS:
   - Sem Docker: `npm run fiscal:db:pglite` (porta `54323`)
   - Com Docker: `npm run fiscal:db:up` (porta `54322`)
 - Migração: `npm run fiscal:db:migrate`
-- Emissão (homologação): `.env` com `FOCUS_NFE_ENV="homologacao"` e `FOCUS_NFE_TOKEN="..."`
+- Emissão:
+  - homologação: `.env` com `FOCUS_NFE_ENV="homologacao"` e `FOCUS_NFE_TOKEN="..."`
+  - produção: `.env` com `FOCUS_NFE_ENV="producao"`, `FOCUS_NFE_PROD_UNLOCK="YES"` e o token de produção da Focus
+- Séries/numeração:
+  - homologação: `FISCAL_NFE_SERIE_HOMOLOG`, `FISCAL_NFE_START_NUMBER_HOMOLOG`
+  - produção: `FISCAL_NFE_SERIE_PROD`, `FISCAL_NFE_START_NUMBER_PROD`
 - Emitente fiscal: `.env` com `FISCAL_ISSUER_*` completos
 - Worker (fila/polling): `npm run fiscal:worker`
+- Seed fiscal inicial: `npm run fiscal:seed -- "NFes_09572986000149_01052026a26052026"`
+- Esse seed usa XMLs só para popular o cadastro fiscal uma vez. A emissão normal passa a ser por pedido e respeita `FOCUS_NFE_ENV`.
 
 ## Próximos passos sugeridos
 

@@ -1,10 +1,10 @@
 import { setTimeout as sleep } from "node:timers/promises";
 
-import { getNfeDefaults } from "../config/nfe_defaults";
+import { getNfeDefaults, pickNfeDefaultsByAmbiente } from "../config/nfe_defaults";
 import { getFiscalDbPool } from "../infra/pg";
 import { withPgTx } from "../persistence/pg/tx";
 import { FiscalEngine, NoopTaxRuleEngine } from "../engine";
-import { FocusNFeClient, FocusNFePayloadBuilder } from "../providers/focus";
+import { FocusNFeClient, FocusNFePayloadBuilder, getFocusEnv } from "../providers/focus";
 import {
   FiscalInvoiceRepositoryPg,
   FiscalOperationRepositoryPg,
@@ -33,7 +33,7 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;
 }
 
-export async function issueNfeHomologacaoSync(
+export async function issueNfeSync(
   input: unknown,
   opts: { pollMs?: number; maxPolls?: number } = {}
 ): Promise<IssueNfeSyncResult> {
@@ -41,7 +41,8 @@ export async function issueNfeHomologacaoSync(
   const maxPolls = opts.maxPolls ?? 15;
 
   const pool = getFiscalDbPool();
-  const defaults = getNfeDefaults();
+  const { ambiente } = getFocusEnv();
+  const defaults = pickNfeDefaultsByAmbiente(getNfeDefaults(), ambiente);
   const focus = new FocusNFeClient();
 
   const productFiscalDataRepo = new ProductFiscalDataRepositoryPg(pool);
@@ -68,7 +69,7 @@ export async function issueNfeHomologacaoSync(
       issuerCnpj: draft.issuer.cnpj,
       model: draft.model,
       serie: draft.serie,
-      startAt: defaults.startNumberHomolog,
+      startAt: defaults.startNumber,
     });
     const focusRef = buildFocusRef({ issuerCnpj: draft.issuer.cnpj, serie: draft.serie, numero });
 
@@ -172,4 +173,11 @@ export async function issueNfeHomologacaoSync(
     sefazMessage: row.sefaz_message,
     chaveAcesso: row.chave_acesso,
   };
+}
+
+export async function issueNfeHomologacaoSync(
+  input: unknown,
+  opts: { pollMs?: number; maxPolls?: number } = {}
+): Promise<IssueNfeSyncResult> {
+  return issueNfeSync(input, opts);
 }

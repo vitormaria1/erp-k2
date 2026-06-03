@@ -1,9 +1,12 @@
 import { z } from "zod";
 import type { Ambiente } from "../../domain/enums";
 
-const EnvSchema = z.object({
-  FOCUS_NFE_TOKEN: z.string().trim().min(10),
+const AmbienteSchema = z.object({
   FOCUS_NFE_ENV: z.union([z.literal("homologacao"), z.literal("producao")]).default("homologacao"),
+});
+
+const EnvSchema = AmbienteSchema.extend({
+  FOCUS_NFE_TOKEN: z.string().trim().min(10),
   FOCUS_NFE_PROD_UNLOCK: z.string().trim().optional(),
 });
 
@@ -12,6 +15,12 @@ export type FocusEnv = {
   ambiente: Ambiente;
   baseUrl: string;
 };
+
+export function getConfiguredFocusAmbiente(): Ambiente {
+  const parsed = AmbienteSchema.safeParse(process.env);
+  if (!parsed.success) return "homologacao";
+  return parsed.data.FOCUS_NFE_ENV as Ambiente;
+}
 
 export function getFocusEnv(): FocusEnv {
   const parsed = EnvSchema.safeParse(process.env);

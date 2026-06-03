@@ -1,7 +1,8 @@
 import { getFiscalDbPool } from "../infra/pg";
 import { withPgTx } from "../persistence/pg/tx";
 import { FiscalEngine, NoopTaxRuleEngine } from "../engine";
-import { FocusNFeClient, FocusNFePayloadBuilder } from "../providers/focus";
+import { FocusNFeClient, FocusNFePayloadBuilder, getFocusEnv } from "../providers/focus";
+import { getNfeDefaults, pickNfeDefaultsByAmbiente } from "../config/nfe_defaults";
 import {
   FiscalInvoiceRepositoryPg,
   FiscalOperationRepositoryPg,
@@ -28,9 +29,11 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;
 }
 
-export async function issueNfeHomologacaoQuick(input: unknown): Promise<IssueNfeQuickResult> {
+export async function issueNfeQuick(input: unknown): Promise<IssueNfeQuickResult> {
   const pool = getFiscalDbPool();
   const focus = new FocusNFeClient();
+  const { ambiente } = getFocusEnv();
+  const defaults = pickNfeDefaultsByAmbiente(getNfeDefaults(), ambiente);
 
   const productFiscalDataRepo = new ProductFiscalDataRepositoryPg(pool);
   const fiscalProfileRepo = new FiscalProfileRepositoryPg(pool);
@@ -56,6 +59,7 @@ export async function issueNfeHomologacaoQuick(input: unknown): Promise<IssueNfe
       issuerCnpj: draft.issuer.cnpj,
       model: draft.model,
       serie: draft.serie,
+      startAt: defaults.startNumber,
     });
     const focusRef = buildFocusRef({ issuerCnpj: draft.issuer.cnpj, serie: draft.serie, numero });
 
@@ -104,3 +108,6 @@ export async function issueNfeHomologacaoQuick(input: unknown): Promise<IssueNfe
   };
 }
 
+export async function issueNfeHomologacaoQuick(input: unknown): Promise<IssueNfeQuickResult> {
+  return issueNfeQuick(input);
+}

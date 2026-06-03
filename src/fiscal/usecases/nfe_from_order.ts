@@ -10,7 +10,7 @@ import {
   ProductFiscalDataRepositoryPg,
 } from "../persistence/pg";
 import { FocusNFeClient, FocusNFePayloadBuilder } from "../providers/focus";
-import { issueNfeHomologacao } from "./issue_nfe";
+import { issueNfe } from "./issue_nfe";
 import { buildFiscalDraftFromOrder } from "./build_draft_from_order";
 
 export async function previewDanfeForOrder(orderId: number): Promise<{ publicPath: string }> {
@@ -46,7 +46,11 @@ export async function previewDanfeForOrder(orderId: number): Promise<{ publicPat
   return { publicPath: `/fiscal/previews/${name}` };
 }
 
-export async function issueNfeForOrderHomologacao(orderId: number) {
+export async function issueNfeForOrder(orderId: number) {
   const { draft } = await buildFiscalDraftFromOrder(orderId);
-  return issueNfeHomologacao(draft);
+  return issueNfe(draft);
+}
+
+export async function issueNfeForOrderHomologacao(orderId: number) {
+  return issueNfeForOrder(orderId);
 }

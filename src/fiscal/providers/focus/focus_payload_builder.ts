@@ -2,6 +2,7 @@ import type { FiscalPayloadBuilder, ProductFiscalDataRepository } from "../../en
 import type { FiscalInvoiceDraft, TaxCalculationResult } from "../../engine/types";
 import { FiscalValidationError } from "../../engine/errors";
 import type { FiscalDbClient } from "../../infra/pg";
+import { getConfiguredFocusAmbiente } from "./config";
 
 function round2(v: number) {
   return Math.round(v * 100) / 100;
@@ -12,7 +13,7 @@ export class FocusNFePayloadBuilder implements FiscalPayloadBuilder<Record<strin
 
   async build(draft: FiscalInvoiceDraft, taxes: TaxCalculationResult[], opts?: { client?: FiscalDbClient }) {
     void taxes;
-    const ambiente = (process.env.FOCUS_NFE_ENV ?? "homologacao").trim();
+    const ambiente = getConfiguredFocusAmbiente();
     const client = opts?.client;
 
     const items = await Promise.all(

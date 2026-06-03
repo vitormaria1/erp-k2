@@ -1,4 +1,5 @@
-import { issueNfeForOrderHomologacao } from "@/fiscal/usecases/nfe_from_order";
+import { issueNfeForOrder } from "@/fiscal/usecases/nfe_from_order";
+import { getConfiguredFocusAmbiente } from "@/fiscal/providers/focus";
 import { processFiscalJobsOnce } from "@/fiscal/worker/processor";
 
 export async function POST(req: Request) {
@@ -9,7 +10,7 @@ export async function POST(req: Request) {
       return new Response("orderId inválido", { status: 400 });
     }
 
-    const issued = await issueNfeForOrderHomologacao(orderId);
+    const issued = await issueNfeForOrder(orderId);
 
     // Dev convenience: process a couple jobs inline so the dashboard updates even without running `npm run fiscal:worker`.
     if (process.env.FISCAL_INLINE_WORKER !== "0") {
@@ -22,6 +23,7 @@ export async function POST(req: Request) {
   } catch (e) {
     const msg =
       e instanceof Error ? `${e.message}${e.stack ? `\n${e.stack}` : ""}` : String(e);
-    return new Response(`Falha ao emitir NF-e (homologação): ${msg}`, { status: 500 });
+    const ambiente = getConfiguredFocusAmbiente();
+    return new Response(`Falha ao emitir NF-e (${ambiente}): ${msg}`, { status: 500 });
   }
 }
