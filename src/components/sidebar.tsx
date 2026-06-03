@@ -13,7 +13,7 @@ const nav: NavItem[] = [
   { href: "/carregamentos", label: "Carregamento" },
   { href: "/producao", label: "Produção" },
   { href: "/compras", label: "Compras" },
-  { href: "/estoque", label: "Estoque" },
+  { href: "/estoque", label: "Produtos" },
   { href: "/nota-fiscal", label: "Nota Fiscal" },
   { href: "/financeiro", label: "Financeiro" },
   { href: "/relatorios", label: "Relatórios" },

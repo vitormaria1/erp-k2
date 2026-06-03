@@ -13,7 +13,7 @@ export default async function EstoquePage(props: { searchParams?: Promise<{ q?: 
     <div className="mx-auto max-w-7xl px-6 py-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Estoque</h1>
+          <h1 className="text-2xl font-semibold">Produtos</h1>
           <div className="text-sm text-[var(--muted)]">
             Ajuste entradas/saídas, edite produtos e personalize as colunas da listagem.
           </div>

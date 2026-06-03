@@ -6,6 +6,13 @@ import type { ProductColumnConfig } from "@/lib/product-columns";
 import type { ProductRecord } from "@/lib/queries";
 
 const STORAGE_KEY = "erp-k2.stock-table.columns";
+const MIN_COLUMN_WIDTH = 80;
+
+type ResizeState = {
+  key: string;
+  startX: number;
+  startWidth: number;
+};
 
 function loadSettings(columns: ProductColumnConfig[]) {
   if (typeof window === "undefined") return columns;
@@ -43,6 +50,7 @@ export function StockTableClient({
 }) {
   const [settings, setSettings] = React.useState<ProductColumnConfig[]>(() => loadSettings(columns));
   const [filter, setFilter] = React.useState("");
+  const [resize, setResize] = React.useState<ResizeState | null>(null);
 
   React.useEffect(() => {
     try {
@@ -51,6 +59,35 @@ export function StockTableClient({
       // noop
     }
   }, [settings]);
+
+  React.useEffect(() => {
+    if (!resize) return;
+    const activeResize = resize;
+
+    function onMove(event: PointerEvent) {
+      setSettings((current) =>
+        current.map((column) => {
+          if (column.key !== activeResize.key) return column;
+          const nextWidth = Math.max(
+            MIN_COLUMN_WIDTH,
+            activeResize.startWidth + (event.clientX - activeResize.startX)
+          );
+          return { ...column, width: nextWidth };
+        })
+      );
+    }
+
+    function onUp() {
+      setResize(null);
+    }
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp, { once: true });
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+    };
+  }, [resize]);
 
   const visibleColumns = React.useMemo(() => settings.filter((column) => column.visible), [settings]);
   const filteredSettings = React.useMemo(() => {
@@ -72,11 +109,15 @@ export function StockTableClient({
     setSettings((current) => current.map((column) => ({ ...column, visible })));
   }
 
+  function resetDefaults() {
+    setSettings(columns);
+  }
+
   return (
     <div className="mt-5 flex flex-col gap-4">
       <details className="rounded-2xl border bg-[var(--card)] shadow-sm">
         <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">
-          Configurar colunas e larguras
+          Configurar colunas
         </summary>
         <div className="border-t px-4 py-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -104,67 +145,78 @@ export function StockTableClient({
               <button
                 type="button"
                 className="rounded-xl border px-3 py-2 text-sm font-semibold"
-                onClick={() => setSettings(columns)}
+                onClick={resetDefaults}
               >
                 Restaurar padrão
               </button>
             </div>
           </div>
 
-          <div className="mt-4 max-h-[360px] overflow-auto rounded-xl border">
-            <div className="grid min-w-[700px] grid-cols-[1fr_90px_100px] gap-2 border-b bg-black/[0.02] px-4 py-3 text-xs font-semibold text-[var(--muted)]">
-              <div>Coluna</div>
-              <div>Largura</div>
-              <div>Visível</div>
+          <div className="mt-4 rounded-xl border">
+            <div className="border-b bg-black/[0.02] px-4 py-3 text-xs text-[var(--muted)]">
+              As larguras são ajustadas diretamente arrastando a borda das colunas na tabela.
             </div>
-            <div className="divide-y">
-              {filteredSettings.map((column) => (
-                <div
-                  key={column.key}
-                  className="grid min-w-[700px] grid-cols-[1fr_90px_100px] items-center gap-2 px-4 py-3"
-                >
-                  <div className="flex flex-col">
-                    <span className="font-medium">{column.label}</span>
-                    <span className="text-xs text-[var(--muted)]">{column.key}</span>
+            <div className="max-h-[360px] overflow-auto">
+              <div className="grid min-w-[700px] grid-cols-[1fr_100px] gap-3 border-b bg-black/[0.02] px-4 py-3 text-xs font-semibold text-[var(--muted)]">
+                <div>Coluna</div>
+                <div>Visível</div>
+              </div>
+              <div className="divide-y">
+                {filteredSettings.map((column) => (
+                  <div
+                    key={column.key}
+                    className="grid min-w-[700px] grid-cols-[1fr_100px] items-center gap-3 px-4 py-3"
+                  >
+                    <div className="flex flex-col">
+                      <span className="font-medium">{column.label}</span>
+                      <span className="text-xs text-[var(--muted)]">{column.key}</span>
+                    </div>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={column.visible}
+                        onChange={(event) =>
+                          updateColumn(column.key, { visible: event.target.checked })
+                        }
+                      />
+                      Mostrar
+                    </label>
                   </div>
-                  <input
-                    type="number"
-                    min="60"
-                    step="10"
-                    value={column.width}
-                    onChange={(event) =>
-                      updateColumn(column.key, { width: Number(event.target.value) || column.width })
-                    }
-                    className="w-full rounded-xl border px-3 py-2 text-sm"
-                  />
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={column.visible}
-                      onChange={(event) =>
-                        updateColumn(column.key, { visible: event.target.checked })
-                      }
-                    />
-                    Mostrar
-                  </label>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         </div>
       </details>
 
       <div className="overflow-x-auto rounded-2xl border bg-[var(--card)] shadow-sm">
-        <table className="min-w-[1600px] w-full text-sm">
+        <table className="w-full min-w-[1600px] table-fixed text-sm">
           <thead className="bg-black/[0.02] text-left text-[var(--muted)]">
             <tr>
               {visibleColumns.map((column) => (
                 <th
                   key={column.key}
-                  className="px-4 py-3"
+                  className="relative px-4 py-3 align-top"
                   style={{ width: `${column.width}px`, minWidth: `${column.width}px` }}
                 >
-                  {column.label}
+                  <div className="pr-3">{column.label}</div>
+                  <button
+                    type="button"
+                    aria-label={`Redimensionar coluna ${column.label}`}
+                    title="Arraste para redimensionar"
+                    className="absolute right-0 top-0 h-full w-3 cursor-col-resize touch-none select-none"
+                    onPointerDown={(event) => {
+                      event.preventDefault();
+                      setResize({
+                        key: column.key,
+                        startX: event.clientX,
+                        startWidth: column.width,
+                      });
+                    }}
+                  >
+                    <span className="absolute right-1 top-1/2 h-6 w-px -translate-y-1/2 bg-black/15" />
+                    <span className="absolute right-0 top-0 h-full w-px bg-black/5" />
+                  </button>
                 </th>
               ))}
               <th className="px-4 py-3">Ações</th>
