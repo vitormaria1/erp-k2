@@ -73,6 +73,8 @@ export type ProductRow = {
   minStock: number | null;
 };
 
+export type ProductRecord = Record<string, string | number | null>;
+
 export function getDashboardMetrics(): DashboardMetrics {
   const db = getDb();
   const ordersToday =
@@ -333,4 +335,37 @@ export function listProducts(opts: { q?: string; limit?: number } = {}): Product
     `
     )
     .all(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`) as ProductRow[];
+}
+
+export function listStockProducts(opts: { q?: string } = {}): ProductRecord[] {
+  const db = getDb();
+  const q = (opts.q ?? "").trim();
+  if (!q) {
+    return db
+      .prepare(
+        `
+        SELECT *
+        FROM products
+        ORDER BY CAST(reference AS INTEGER) ASC, reference ASC
+      `
+      )
+      .all() as ProductRecord[];
+  }
+
+  return db
+    .prepare(
+      `
+      SELECT *
+      FROM products
+      WHERE
+        reference LIKE ? OR description LIKE ? OR tele_ref LIKE ? OR barcode LIKE ? OR gtin LIKE ? OR "Descr.Prod." LIKE ?
+      ORDER BY CAST(reference AS INTEGER) ASC, reference ASC
+    `
+    )
+    .all(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`) as ProductRecord[];
+}
+
+export function getProductById(id: string): ProductRecord | null {
+  const db = getDb();
+  return (db.prepare("SELECT * FROM products WHERE id = ?").get(id) as ProductRecord | undefined) ?? null;
 }
