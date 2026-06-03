@@ -84,6 +84,10 @@ cd /opt/erp-k2
 
 git clone https://github.com/vitormaria1/erp-k2.git .
 
+# Configure o ambiente antes de subir o container.
+# O app fiscal exige as variáveis FISCAL_ISSUER_* e as credenciais da Focus NFe.
+# Você pode partir de .env.example e ajustar os valores reais.
+
 # Banco (1ª vez) - ou copie seu erp.db atual para /opt/erp-k2/data/erp.db
 mkdir -p data
 npm ci
@@ -108,6 +112,7 @@ HTTPS:
   - Com Docker: `npm run fiscal:db:up` (porta `54322`)
 - Migração: `npm run fiscal:db:migrate`
 - Emissão (homologação): `.env` com `FOCUS_NFE_ENV="homologacao"` e `FOCUS_NFE_TOKEN="..."`
+- Emitente fiscal: `.env` com `FISCAL_ISSUER_*` completos
 - Worker (fila/polling): `npm run fiscal:worker`
 
 ## Próximos passos sugeridos

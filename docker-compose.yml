@@ -3,6 +3,8 @@ services:
     build: .
     container_name: erp-k2-app
     restart: unless-stopped
+    env_file:
+      - .env
     environment:
       # Keep DB outside container image
       DATABASE_PATH: /app/data/erp.db
