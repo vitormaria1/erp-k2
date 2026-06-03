@@ -90,6 +90,17 @@ def _iter_tables(pdf_path: Path) -> Iterable[tuple[int, list[list[str]]]]:
                     yield page_number, normalized
 
 
+def _normalize_table(table: list[list[Any]] | None) -> list[list[str]]:
+    if not table:
+        return []
+    normalized = [
+        [_normalize_cell(cell) for cell in (row or [])]
+        for row in table
+        if row is not None
+    ]
+    return [row for row in normalized if any(row)]
+
+
 def _rows_as_dicts(headers: list[str], rows: list[list[str]]) -> list[dict[str, str]]:
     out: list[dict[str, str]] = []
     for row in rows:
@@ -141,6 +152,103 @@ def extract_first_table_from_all_pages(pdf_path: Path) -> ExtractResult:
         raise RuntimeError(f"No tables found in {pdf_path}")
 
     return ExtractResult(headers=headers, rows=rows)
+
+
+def extract_product_tables_by_block(pdf_path: Path, block_size: int = 16) -> ExtractResult:
+    """Extract product records that span a fixed multi-page block.
+
+    The products PDF repeats the same product rows across 16 pages, each page
+    carrying a different slice of fields for the same row index. We merge those
+    pages by block and by row number.
+    """
+
+    pages: list[list[list[str]]] = []
+    with pdfplumber.open(str(pdf_path)) as pdf:
+        for page in pdf.pages:
+            tables = page.extract_tables() or []
+            first_table = _normalize_table(tables[0] if tables else None)
+            if first_table:
+                pages.append(first_table)
+
+    if not pages:
+        raise RuntimeError(f"No product tables found in {pdf_path}")
+
+    all_headers: list[str] = []
+    header_norm_to_name: dict[str, str] = {}
+    merged_by_reference: dict[str, dict[str, str]] = {}
+    order: list[str] = []
+
+    def register_headers(headers: list[str]) -> list[str]:
+        deduped = _dedupe_headers(headers)
+        canonical: list[str] = []
+        for header in deduped:
+            norm = _normalize_header(header)
+            if not norm:
+                canonical.append(header)
+                continue
+            existing = header_norm_to_name.get(norm)
+            if existing is None:
+                header_norm_to_name[norm] = header
+                all_headers.append(header)
+                canonical.append(header)
+            else:
+                canonical.append(existing)
+        return canonical
+
+    for start in range(0, len(pages), block_size):
+        block = pages[start : start + block_size]
+        if not block:
+            continue
+
+        canonical_headers_by_page = [register_headers(table[0]) for table in block]
+        row_count = max(len(table) - 1 for table in block)
+        key_headers = canonical_headers_by_page[0]
+        key_index = next(
+            (idx for idx, header in enumerate(key_headers) if _normalize_header(header) == _normalize_header("Nr.Referencia")),
+            0,
+        )
+
+        for row_index in range(row_count):
+            combined: dict[str, str] = {}
+
+            for headers, table in zip(canonical_headers_by_page, block):
+                rows = table[1:]
+                if row_index >= len(rows):
+                    continue
+                values = [_normalize_cell(cell) for cell in rows[row_index]]
+                if not any(values):
+                    continue
+
+                for idx, value in enumerate(values[: len(headers)]):
+                    if not value:
+                        continue
+                    header = headers[idx]
+                    previous = combined.get(header, "")
+                    if not previous or previous == value:
+                        combined[header] = value
+                    elif value not in previous.split(" | "):
+                        combined[header] = f"{previous} | {value}"
+
+            if not key_headers or key_index >= len(key_headers):
+                continue
+            reference = combined.get(key_headers[key_index], "").strip()
+            if not reference:
+                continue
+
+            if reference not in merged_by_reference:
+                merged_by_reference[reference] = {}
+                order.append(reference)
+
+            record = merged_by_reference[reference]
+            for header, value in combined.items():
+                previous = record.get(header, "")
+                if not previous or previous == value:
+                    record[header] = value
+                elif value not in previous.split(" | "):
+                    record[header] = f"{previous} | {value}"
+
+    rows = [[merged_by_reference[reference].get(header, "") for header in all_headers] for reference in order]
+    return ExtractResult(headers=all_headers, rows=rows)
 
 
 def extract_customer_tables_by_key(pdf_path: Path, key_header: str = "Cod.Cadastro") -> ExtractResult:
@@ -284,7 +392,7 @@ def main() -> None:
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
     if args.products_pdf is not None:
-        products = extract_first_table_from_all_pages(args.products_pdf)
+        products = extract_product_tables_by_block(args.products_pdf)
         (args.out_dir / "products.raw.json").write_text(
             json.dumps(
                 {

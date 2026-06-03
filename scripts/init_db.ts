@@ -66,7 +66,6 @@ function sanitizeReference(raw: string | undefined): string | null {
   if (!v) return null;
   const digits = v.replace(/[^\d]/g, "");
   if (!digits) return null;
-  if (digits.length < 6) return null;
   return digits;
 }
 
