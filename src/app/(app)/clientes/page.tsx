@@ -46,6 +46,7 @@ export default async function ClientesPage(props: { searchParams?: Promise<{ q?:
               <th className="px-4 py-3">Fantasia</th>
               <th className="px-4 py-3">CPF/CNPJ</th>
               <th className="px-4 py-3">IE</th>
+              <th className="px-4 py-3">TP Cad.</th>
               <th className="px-4 py-3">Contrib.</th>
               <th className="px-4 py-3">CEP</th>
               <th className="px-4 py-3">Endereço</th>
@@ -65,7 +66,6 @@ export default async function ClientesPage(props: { searchParams?: Promise<{ q?:
               <th className="px-4 py-3">Última atualiz.</th>
               <th className="px-4 py-3">Bloqueado</th>
               <th className="px-4 py-3">Motivo bloqueio</th>
-              <th className="px-4 py-3">Cód. TP cad.</th>
               <th className="px-4 py-3">Ações</th>
             </tr>
           </thead>
@@ -77,6 +77,7 @@ export default async function ClientesPage(props: { searchParams?: Promise<{ q?:
                 <td className="px-4 py-3 text-[var(--muted)]">{c.tradeName ?? "-"}</td>
                 <td className="px-4 py-3">{c.cnpj ?? "-"}</td>
                 <td className="px-4 py-3">{c.stateTaxId ?? "-"}</td>
+                <td className="px-4 py-3">{c.customerTypeCode ?? "-"}</td>
                 <td className="px-4 py-3">{c.taxpayer ? "Sim" : "Não"}</td>
                 <td className="px-4 py-3">{c.cep ?? "-"}</td>
                 <td className="px-4 py-3">{c.street ?? "-"}</td>
@@ -96,7 +97,6 @@ export default async function ClientesPage(props: { searchParams?: Promise<{ q?:
                 <td className="px-4 py-3">{c.lastUpdatedAt ?? "-"}</td>
                 <td className="px-4 py-3">{c.blocked ? "Sim" : "Não"}</td>
                 <td className="px-4 py-3">{c.blockReason ?? "-"}</td>
-                <td className="px-4 py-3">{c.customerTypeCode ?? "-"}</td>
                 <td className="px-4 py-3">
                   <Link
                     href={`/clientes/${c.id}/editar`}

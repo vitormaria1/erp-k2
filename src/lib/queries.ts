@@ -132,7 +132,6 @@ export function listLowStock(limit = 6): LowStockItem[] {
     .all(limit) as LowStockItem[];
 }
 
-
 const customerSelect = `
   SELECT
     id,

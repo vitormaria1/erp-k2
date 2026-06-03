@@ -56,10 +56,8 @@ function yesNoFlag(value: string | undefined): number {
 function sanitizeReference(raw: string | undefined): string | null {
   const v = (raw ?? "").trim();
   if (!v) return null;
-  // Keep only digits; PDFs sometimes shift columns and put text/quantities here.
   const digits = v.replace(/[^\d]/g, "");
   if (!digits) return null;
-  // Heuristic: Nr.Referencia from the report is typically long and numeric.
   if (digits.length < 6) return null;
   return digits;
 }

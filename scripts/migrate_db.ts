@@ -55,18 +55,15 @@ async function main() {
 
   // Backfill columns for production_orders
   ensureColumn(db, "production_orders", "status", "TEXT NOT NULL DEFAULT 'OPEN'");
-  // SQLite não permite DEFAULT não-constante em ALTER TABLE ADD COLUMN.
   ensureColumn(db, "production_orders", "started_at", "TEXT");
   ensureColumn(db, "production_orders", "completed_at", "TEXT");
 
-  // Backfill valores
   if (hasColumn(db, "production_orders", "started_at")) {
     db.exec(
       "UPDATE production_orders SET started_at = COALESCE(started_at, created_at, datetime('now'))"
     );
   }
 
-  // Backfill reason_code/note a partir do campo legado "reason" (ex.: "PURCHASE:foo")
   if (hasColumn(db, "stock_movements", "reason") && hasColumn(db, "stock_movements", "reason_code")) {
     const rows = db
       .prepare("SELECT id, reason FROM stock_movements WHERE reason IS NOT NULL AND (reason_code IS NULL OR reason_code = '')")

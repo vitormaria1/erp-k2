@@ -204,7 +204,6 @@ CREATE TABLE IF NOT EXISTS production_order_inputs (
 CREATE INDEX IF NOT EXISTS idx_production_order_inputs_order ON production_order_inputs(production_order_id);
 CREATE INDEX IF NOT EXISTS idx_production_order_inputs_input ON production_order_inputs(input_product_id);
 
--- Compras (entrada manual de notas)
 CREATE TABLE IF NOT EXISTS purchase_invoices (
   id TEXT PRIMARY KEY,
   supplier_name TEXT,
@@ -229,7 +228,6 @@ CREATE TABLE IF NOT EXISTS purchase_invoice_items (
 CREATE INDEX IF NOT EXISTS idx_purchase_invoice_items_invoice ON purchase_invoice_items(purchase_invoice_id);
 CREATE INDEX IF NOT EXISTS idx_purchase_invoice_items_product ON purchase_invoice_items(product_id);
 
--- Rotas (organização de entregas e contatos por dia)
 CREATE TABLE IF NOT EXISTS route_weeks (
   id TEXT PRIMARY KEY,
   week_start TEXT NOT NULL UNIQUE, -- YYYY-MM-DD (segunda-feira)
