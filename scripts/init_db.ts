@@ -5,15 +5,7 @@ import { randomUUID } from "node:crypto";
 
 import Database from "better-sqlite3";
 
-type ProductRow = {
-  "Nr.Referencia": string;
-  "Ref.Tele.": string;
-  "Nr.CodBarras": string;
-  "Nr. GTIN Tributavel": string;
-  "Descr.Prod.": string;
-  Composicao: string;
-  Un: string;
-};
+type ProductRow = Record<string, string | undefined>;
 
 type ClientRow = Record<string, string | undefined>;
 
@@ -69,6 +61,42 @@ function sanitizeReference(raw: string | undefined): string | null {
   return digits;
 }
 
+function quoteIdentifier(name: string): string {
+  return `"${name.replace(/"/g, '""')}"`;
+}
+
+function ensureProductPdfColumns(db: Database.Database, headers: string[]) {
+  const existing = new Set(
+    (db.prepare("PRAGMA table_info(products)").all() as { name: string }[]).map((row) => row.name)
+  );
+  for (const header of headers) {
+    if (existing.has(header)) continue;
+    db.exec(`ALTER TABLE products ADD COLUMN ${quoteIdentifier(header)} TEXT`);
+  }
+}
+
+function buildProductUpsert(db: Database.Database, headers: string[]) {
+  const coreColumns = ["id", "reference", "tele_ref", "barcode", "gtin", "description", "composition", "unit"];
+  const insertColumns = [...coreColumns, ...headers];
+  const insertPlaceholders = [
+    ...coreColumns.map(() => "?"),
+    ...headers.map(() => "?"),
+    "datetime('now')",
+  ];
+  const updateColumns = [...coreColumns.slice(2), ...headers];
+  const updateSet = [
+    ...updateColumns.map((column) => `${quoteIdentifier(column)} = excluded.${quoteIdentifier(column)}`),
+    `updated_at = datetime('now')`,
+  ];
+
+  return db.prepare(`
+    INSERT INTO products (${[...insertColumns.map(quoteIdentifier), "updated_at"].join(", ")})
+    VALUES (${[...insertPlaceholders].join(", ")})
+    ON CONFLICT(reference) DO UPDATE SET
+      ${updateSet.join(",\n      ")}
+  `);
+}
+
 async function readJson<T>(relPath: string): Promise<T> {
   const abs = path.join(process.cwd(), relPath);
   const raw = await readFile(abs, "utf-8");
@@ -87,6 +115,7 @@ async function main() {
 
   const products = await readJson<ProductRow[]>("data/products.json");
   const clients = await readJson<ClientRow[]>("data/clients.json");
+  const productHeaders = products[0] ? Object.keys(products[0]) : [];
 
   const selectCustomerId = db.prepare("SELECT id FROM customers WHERE code = ?");
   const upsertCustomer = db.prepare(`
@@ -130,21 +159,16 @@ async function main() {
       updated_at=datetime('now')
   `);
 
-  const selectProductId = db.prepare("SELECT id FROM products WHERE reference = ?");
-  const upsertProduct = db.prepare(`
-    INSERT INTO products (id, reference, tele_ref, barcode, gtin, description, composition, unit, updated_at)
-    VALUES (@id, @reference, @tele_ref, @barcode, @gtin, @description, @composition, @unit, datetime('now'))
-    ON CONFLICT(reference) DO UPDATE SET
-      tele_ref=excluded.tele_ref,
-      barcode=excluded.barcode,
-      gtin=excluded.gtin,
-      description=excluded.description,
-      composition=excluded.composition,
-      unit=excluded.unit,
-      updated_at=datetime('now')
-  `);
-
   const tx = db.transaction(() => {
+    const existingProductIds = new Map(
+      (db.prepare("SELECT reference, id FROM products").all() as { reference: string; id: string }[]).map(
+        (row) => [row.reference, row.id]
+      )
+    );
+
+    ensureProductPdfColumns(db, productHeaders);
+    const upsertProduct = buildProductUpsert(db, productHeaders);
+
     db.exec("CREATE TEMP TABLE IF NOT EXISTS seed_products (reference TEXT PRIMARY KEY)");
     const clearSeedProducts = db.prepare("DELETE FROM seed_products");
     const insertSeedProduct = db.prepare("INSERT OR IGNORE INTO seed_products (reference) VALUES (?)");
@@ -212,18 +236,18 @@ async function main() {
     for (const p of products) {
       const reference = sanitizeReference(p["Nr.Referencia"]);
       if (!reference) continue;
-      const existing = selectProductId.get(reference) as { id: string } | undefined;
-
-      upsertProduct.run({
-        id: existing?.id ?? randomUUID(),
+      const values = [
+        existingProductIds.get(reference) ?? randomUUID(),
         reference,
-        tele_ref: nonEmptyOrNull(p["Ref.Tele."]),
-        barcode: nonEmptyOrNull(p["Nr.CodBarras"]),
-        gtin: nonEmptyOrNull(p["Nr. GTIN Tributavel"]),
-        description: (p["Descr.Prod."] ?? "").trim() || reference,
-        composition: nonEmptyOrNull(p.Composicao),
-        unit: (p.Un ?? "").trim() || "UN",
-      });
+        nonEmptyOrNull(p["Ref.Tele."]),
+        nonEmptyOrNull(p["Nr.CodBarras"]),
+        nonEmptyOrNull(p["Nr. GTIN Tributavel"]),
+        (p["Descr.Prod."] ?? "").trim() || reference,
+        nonEmptyOrNull(p.Composicao),
+        (p.Un ?? "").trim() || "UN",
+        ...productHeaders.map((header) => String(p[header] ?? "")),
+      ];
+      upsertProduct.run(...values);
     }
 
     purgeStaleProducts.run();
