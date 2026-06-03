@@ -25,12 +25,12 @@ function normalizeHeader(value) {
 function readField(row, aliases) {
   for (const alias of aliases) {
     const direct = row[alias];
-    if (direct !== undefined) return direct;
+    if (direct !== undefined && String(direct).trim()) return direct;
   }
 
   const normalizedAliases = new Set(aliases.map(normalizeHeader));
   for (const [key, value] of Object.entries(row)) {
-    if (normalizedAliases.has(normalizeHeader(key))) return value;
+    if (normalizedAliases.has(normalizeHeader(key)) && String(value ?? "").trim()) return value;
   }
 
   return undefined;
@@ -39,6 +39,14 @@ function readField(row, aliases) {
 function yesNoFlag(value) {
   const normalized = normalizeHeader(value ?? "");
   return ["s", "sim", "y", "yes", "true", "1"].includes(normalized) ? 1 : 0;
+}
+
+function splitCityUf(raw) {
+  const value = nonEmptyOrNull(raw);
+  if (!value) return { city: null, uf: null };
+  const match = value.match(/^(.*?)(?:\s*\/\s*([A-Z]{2}))$/);
+  if (!match) return { city: value, uf: null };
+  return { city: match[1].trim() || null, uf: match[2].trim() || null };
 }
 
 function sanitizeReference(raw) {
@@ -142,6 +150,7 @@ async function main() {
       const code = readField(c, ["Cod.Cadastro", "Código", "Codigo", "Cod Cadastro"])?.trim();
       if (!code) continue;
       const existing = selectCustomerId.get(code);
+      const cityUf = splitCityUf(readField(c, ["Cidade/UF Cliente", "Cidade/UF"]));
       upsertCustomer.run({
         id: existing?.id ?? randomUUID(),
         code,
@@ -155,8 +164,8 @@ async function main() {
         number: nonEmptyOrNull(readField(c, ["Número", "Numero", "Numero End.", "Número End.", "Nº", "Nr.", "Nro"])),
         complement: nonEmptyOrNull(readField(c, ["Complemento", "Compl."])),
         neighborhood: nonEmptyOrNull(readField(c, ["Bairro"])),
-        city: nonEmptyOrNull(readField(c, ["Cidade", "Município", "Municipio"])),
-        uf: nonEmptyOrNull(readField(c, ["UF", "Estado"])),
+        city: cityUf.city ?? nonEmptyOrNull(readField(c, ["Cidade", "Município", "Municipio"])),
+        uf: cityUf.uf ?? nonEmptyOrNull(readField(c, ["UF", "Estado"])),
         city_code: nonEmptyOrNull(
           readField(c, ["Cod.Cidade", "Cod.Mun", "Cod. Município", "Código Município", "Codigo Municipio", "cMun"])
         ),
@@ -165,7 +174,7 @@ async function main() {
           readField(c, ["Cod.País", "Cod.Pais", "Código País", "Codigo Pais", "cPais"])
         ),
         phone: nonEmptyOrNull(readField(c, ["Fone", "Telefone", "Celular", "Phone"])),
-        email: nonEmptyOrNull(readField(c, ["e-mail", "E-mail", "Email"])),
+        email: nonEmptyOrNull(readField(c, ["e-mail", "E-mail", "Email", "e-mail para NF-e"])),
         home_page: nonEmptyOrNull(readField(c, ["Home Page", "Homepage", "Site"])),
         tracks_orders: yesNoFlag(readField(c, ["Acompanha Pedidos?", "Acompanha Pedidos", "Acompanha Pedido"])),
         registered_at: nonEmptyOrNull(readField(c, ["Data Cad.", "Data Cadastro", "Data Cad", "Cadastro Em"])),

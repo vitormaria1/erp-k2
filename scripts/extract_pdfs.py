@@ -98,6 +98,25 @@ def _rows_as_dicts(headers: list[str], rows: list[list[str]]) -> list[dict[str, 
     return out
 
 
+def _header_signature(headers: list[str]) -> set[str]:
+    return {_normalize_header(header) for header in headers if header}
+
+
+def _detect_customer_role(headers: list[str]) -> str | None:
+    normalized = _header_signature(headers)
+    if not normalized:
+        return None
+    if "codcadastro" in normalized and "nomefantasia" in normalized:
+        return "base"
+    if "endereco" in normalized and "codcidade" in normalized:
+        return "address"
+    if "cidadeufcliente" in normalized and "tipopessoa" in normalized:
+        return "city"
+    if "email" in normalized and "datacad" in normalized and "ultimaatualiz" in normalized:
+        return "contact"
+    return None
+
+
 def extract_first_table_from_all_pages(pdf_path: Path) -> ExtractResult:
     headers: list[str] | None = None
     rows: list[list[str]] = []
@@ -125,21 +144,21 @@ def extract_first_table_from_all_pages(pdf_path: Path) -> ExtractResult:
 
 
 def extract_customer_tables_by_key(pdf_path: Path, key_header: str = "Cod.Cadastro") -> ExtractResult:
-    """Extract customer tables that may be split horizontally across many PDF pages.
+    """Extract customer tables that are split across multiple PDF pages.
 
-    Some ERP reports print a fixed group of customers over several pages so that
-    each page shows a different subset of columns. This routine merges every
-    table segment by ``key_header`` instead of treating each page as an isolated
-    list, preserving all columns found across the report.
+    The customer report is printed in repeating 4-page blocks:
+    - base data
+    - address
+    - city/pessoa
+    - contact/audit
+
+    We merge those pages by row index inside each block.
     """
 
     all_headers: list[str] = []
     header_norm_to_name: dict[str, str] = {}
     merged_by_key: dict[str, dict[str, str]] = {}
     order: list[str] = []
-    current_headers: list[str] | None = None
-    current_keys: list[str] = []
-    key_norm = _normalize_header(key_header)
 
     def register_headers(headers: list[str]) -> list[str]:
         deduped = _dedupe_headers(headers)
@@ -158,42 +177,73 @@ def extract_customer_tables_by_key(pdf_path: Path, key_header: str = "Cod.Cadast
                 canonical.append(name)
         return canonical
 
+    blocks: list[dict[str, list[list[str]]]] = []
+    current_block: dict[str, list[list[str]]] | None = None
+
     for _page_number, table in _iter_tables(pdf_path):
-        first_row = table[0]
-        if _looks_like_header(first_row, key_header):
-            current_headers = register_headers(first_row)
-            data_rows = table[1:]
-        elif current_headers is not None:
-            data_rows = table
+        if not table:
+            continue
+        role = _detect_customer_role(table[0])
+        if role == "base":
+            if current_block is not None:
+                blocks.append(current_block)
+            current_block = {"base": table}
+        elif role in {"address", "city", "contact"} and current_block is not None:
+            current_block[role] = table
         else:
             continue
 
-        if not current_headers:
+    if current_block is not None:
+        blocks.append(current_block)
+
+    for block in blocks:
+        base_table = block.get("base")
+        if not base_table:
             continue
 
+        base_headers = register_headers(base_table[0])
+        address_headers = register_headers(block["address"][0]) if "address" in block else []
+        city_headers = register_headers(block["city"][0]) if "city" in block else []
+        contact_headers = register_headers(block["contact"][0]) if "contact" in block else []
+
+        base_rows = base_table[1:]
+        address_rows = block["address"][1:] if "address" in block else []
+        city_rows = block["city"][1:] if "city" in block else []
+        contact_rows = block["contact"][1:] if "contact" in block else []
+        row_count = max(len(base_rows), len(address_rows), len(city_rows), len(contact_rows))
+
         key_index = next(
-            (idx for idx, header in enumerate(current_headers) if _normalize_header(header) == key_norm),
-            None,
+            (idx for idx, header in enumerate(base_headers) if _normalize_header(header) == _normalize_header(key_header)),
+            0,
         )
-        keyed_segment = key_index is not None
-        next_keys: list[str] = []
 
-        for row_index, row in enumerate(data_rows):
-            values = [_normalize_cell(c) for c in row]
-            if not any(values):
-                continue
-            if _is_repeated_header(values, current_headers):
-                continue
+        for row_index in range(row_count):
+            combined: dict[str, str] = {}
+            for headers, rows in (
+                (base_headers, base_rows),
+                (address_headers, address_rows),
+                (city_headers, city_rows),
+                (contact_headers, contact_rows),
+            ):
+                if row_index >= len(rows):
+                    continue
+                values = [_normalize_cell(cell) for cell in rows[row_index]]
+                if not any(values):
+                    continue
+                for idx, value in enumerate(values[: len(headers)]):
+                    if not value:
+                        continue
+                    header = headers[idx]
+                    previous = combined.get(header, "")
+                    if not previous or previous == value:
+                        combined[header] = value
+                    elif value not in previous.split(" | "):
+                        combined[header] = f"{previous} | {value}"
 
-            key = values[key_index].strip() if key_index is not None and key_index < len(values) else ""
-            if key:
-                next_keys.append(key)
-            elif row_index < len(current_keys):
-                # Some ERP reports split one customer group horizontally across pages.
-                # Continuation pages often omit Cod.Cadastro; stitch them by row order
-                # using the keys captured from the most recent keyed segment.
-                key = current_keys[row_index]
-            else:
+            if not base_headers or key_index >= len(base_headers):
+                continue
+            key = combined.get(base_headers[key_index], "").strip()
+            if not key:
                 continue
 
             if key not in merged_by_key:
@@ -201,18 +251,12 @@ def extract_customer_tables_by_key(pdf_path: Path, key_header: str = "Cod.Cadast
                 order.append(key)
 
             record = merged_by_key[key]
-            for idx, value in enumerate(values[: len(current_headers)]):
-                if not value:
-                    continue
-                header = current_headers[idx]
+            for header, value in combined.items():
                 previous = record.get(header, "")
                 if not previous or previous == value:
                     record[header] = value
                 elif value not in previous.split(" | "):
                     record[header] = f"{previous} | {value}"
-
-        if keyed_segment and next_keys:
-            current_keys = next_keys
 
     if not all_headers:
         raise RuntimeError(f"No customer table headers found in {pdf_path}")
