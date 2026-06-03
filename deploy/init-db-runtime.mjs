@@ -145,6 +145,34 @@ async function main() {
   `);
 
   const tx = db.transaction(() => {
+    db.exec("CREATE TEMP TABLE IF NOT EXISTS seed_products (reference TEXT PRIMARY KEY)");
+    const clearSeedProducts = db.prepare("DELETE FROM seed_products");
+    const insertSeedProduct = db.prepare("INSERT OR IGNORE INTO seed_products (reference) VALUES (?)");
+    const purgeStaleProducts = db.prepare(`
+      DELETE FROM products
+      WHERE NOT EXISTS (
+        SELECT 1
+        FROM seed_products sp
+        WHERE sp.reference = products.reference
+      )
+      AND NOT EXISTS (SELECT 1 FROM order_items oi WHERE oi.product_id = products.id)
+      AND NOT EXISTS (SELECT 1 FROM stock_movements sm WHERE sm.product_id = products.id)
+      AND NOT EXISTS (SELECT 1 FROM production_order_products pop WHERE pop.product_id = products.id)
+      AND NOT EXISTS (SELECT 1 FROM production_order_inputs poi WHERE poi.input_product_id = products.id)
+      AND NOT EXISTS (SELECT 1 FROM purchase_invoice_items pii WHERE pii.product_id = products.id)
+      AND NOT EXISTS (
+        SELECT 1
+        FROM product_recipes pr
+        WHERE pr.product_id = products.id OR pr.input_product_id = products.id
+      )
+    `);
+
+    clearSeedProducts.run();
+    for (const p of products) {
+      const reference = sanitizeReference(p["Nr.Referencia"]);
+      if (reference) insertSeedProduct.run(reference);
+    }
+
     for (const c of clients) {
       const code = readField(c, ["Cod.Cadastro", "Código", "Codigo", "Cod Cadastro"])?.trim();
       if (!code) continue;
@@ -199,6 +227,8 @@ async function main() {
         unit: String(p.Un ?? "").trim() || "UN",
       });
     }
+
+    purgeStaleProducts.run();
   });
 
   tx();
