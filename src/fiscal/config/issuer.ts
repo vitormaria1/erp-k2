@@ -54,7 +54,7 @@ function formatZodIssues(error: z.ZodError) {
     if (typeof key !== "string" || !issuerEnvKeys.includes(key as (typeof issuerEnvKeys)[number])) {
       continue;
     }
-    if (issue.code === "invalid_type" && issue.received === "undefined") {
+    if (issue.code === "invalid_type") {
       missingKeys.add(key);
       continue;
     }
