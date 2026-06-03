@@ -34,6 +34,10 @@ jobs:
             cd /opt/erp-k2
             git pull --ff-only
 
+            if [ ! -f .env ]; then
+              echo "Warning: /opt/erp-k2/.env not found. The app will start, but fiscal settings will be empty until you add it."
+            fi
+
             RESET_SQLITE_DB="${{ github.event_name == 'workflow_dispatch' && inputs.reset_sqlite_db || 'false' }}"
             if [ "$RESET_SQLITE_DB" = "true" ]; then
               echo "Resetting production SQLite database after backup..."

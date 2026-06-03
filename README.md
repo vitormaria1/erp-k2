@@ -87,6 +87,7 @@ git clone https://github.com/vitormaria1/erp-k2.git .
 # Configure o ambiente antes de subir o container.
 # O app fiscal exige as variáveis FISCAL_ISSUER_* e as credenciais da Focus NFe.
 # Você pode partir de .env.example e ajustar os valores reais.
+# Se o arquivo .env ainda não existir, o deploy sobe mesmo assim, mas a emissão fiscal fica indisponível até você criá-lo.
 
 # Banco (1ª vez) - ou copie seu erp.db atual para /opt/erp-k2/data/erp.db
 mkdir -p data
