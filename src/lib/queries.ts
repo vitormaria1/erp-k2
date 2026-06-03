@@ -56,9 +56,19 @@ export type CustomerRow = {
 export type ProductRow = {
   id: string;
   reference: string;
+  teleRef: string | null;
+  barcode: string | null;
+  gtin: string | null;
   description: string;
+  composition: string | null;
   unit: string;
   kind: string;
+  price: number | null;
+  cost: number | null;
+  classFiscalNcm: string | null;
+  descUnidade: string | null;
+  dataCad: string | null;
+  ultimaAtualiz: string | null;
   stockQty: number;
   minStock: number | null;
 };
@@ -213,13 +223,56 @@ export function listProducts(opts: { q?: string; limit?: number } = {}): Product
     if (typeof limit === "number") {
       return db
         .prepare(
-          "SELECT id, reference, description, unit, kind, stock_qty as stockQty, min_stock as minStock FROM products ORDER BY CAST(reference AS INTEGER) ASC, reference ASC LIMIT ?"
+          `
+          SELECT
+            id,
+            reference,
+            tele_ref as teleRef,
+            barcode,
+            gtin,
+            description,
+            composition,
+            unit,
+            kind,
+            price,
+            cost,
+            "Class.Fiscal/NCM" as classFiscalNcm,
+            "Desc.Unidade" as descUnidade,
+            "Data Cad." as dataCad,
+            "Ultima Atualiz." as ultimaAtualiz,
+            stock_qty as stockQty,
+            min_stock as minStock
+          FROM products
+          ORDER BY CAST(reference AS INTEGER) ASC, reference ASC
+          LIMIT ?
+        `
         )
         .all(limit) as ProductRow[];
     }
     return db
       .prepare(
-        "SELECT id, reference, description, unit, kind, stock_qty as stockQty, min_stock as minStock FROM products ORDER BY CAST(reference AS INTEGER) ASC, reference ASC"
+        `
+        SELECT
+          id,
+          reference,
+          tele_ref as teleRef,
+          barcode,
+          gtin,
+          description,
+          composition,
+          unit,
+          kind,
+          price,
+          cost,
+          "Class.Fiscal/NCM" as classFiscalNcm,
+          "Desc.Unidade" as descUnidade,
+          "Data Cad." as dataCad,
+          "Ultima Atualiz." as ultimaAtualiz,
+          stock_qty as stockQty,
+          min_stock as minStock
+        FROM products
+        ORDER BY CAST(reference AS INTEGER) ASC, reference ASC
+      `
       )
       .all() as ProductRow[];
   }
@@ -227,23 +280,57 @@ export function listProducts(opts: { q?: string; limit?: number } = {}): Product
     return db
       .prepare(
         `
-        SELECT id, reference, description, unit, kind, stock_qty as stockQty, min_stock as minStock
+        SELECT
+          id,
+          reference,
+          tele_ref as teleRef,
+          barcode,
+          gtin,
+          description,
+          composition,
+          unit,
+          kind,
+          price,
+          cost,
+          "Class.Fiscal/NCM" as classFiscalNcm,
+          "Desc.Unidade" as descUnidade,
+          "Data Cad." as dataCad,
+          "Ultima Atualiz." as ultimaAtualiz,
+          stock_qty as stockQty,
+          min_stock as minStock
         FROM products
-        WHERE description LIKE ? OR reference LIKE ? OR barcode LIKE ? OR gtin LIKE ?
+        WHERE description LIKE ? OR reference LIKE ? OR barcode LIKE ? OR gtin LIKE ? OR tele_ref LIKE ?
         ORDER BY CAST(reference AS INTEGER) ASC, reference ASC
         LIMIT ?
       `
       )
-      .all(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, limit) as ProductRow[];
+      .all(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, limit) as ProductRow[];
   }
   return db
     .prepare(
       `
-      SELECT id, reference, description, unit, kind, stock_qty as stockQty, min_stock as minStock
+      SELECT
+        id,
+        reference,
+        tele_ref as teleRef,
+        barcode,
+        gtin,
+        description,
+        composition,
+        unit,
+        kind,
+        price,
+        cost,
+        "Class.Fiscal/NCM" as classFiscalNcm,
+        "Desc.Unidade" as descUnidade,
+        "Data Cad." as dataCad,
+        "Ultima Atualiz." as ultimaAtualiz,
+        stock_qty as stockQty,
+        min_stock as minStock
       FROM products
-      WHERE description LIKE ? OR reference LIKE ? OR barcode LIKE ? OR gtin LIKE ?
+      WHERE description LIKE ? OR reference LIKE ? OR barcode LIKE ? OR gtin LIKE ? OR tele_ref LIKE ?
       ORDER BY CAST(reference AS INTEGER) ASC, reference ASC
     `
     )
-    .all(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`) as ProductRow[];
+    .all(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`) as ProductRow[];
 }

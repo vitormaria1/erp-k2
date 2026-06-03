@@ -28,14 +28,25 @@ export default async function EstoquePage(props: { searchParams?: Promise<{ q?: 
         </form>
       </div>
 
-      <div className="mt-5 overflow-hidden rounded-2xl border bg-[var(--card)] shadow-sm">
-        <table className="w-full text-sm">
+      <div className="mt-5 overflow-x-auto rounded-2xl border bg-[var(--card)] shadow-sm">
+        <table className="min-w-[1600px] w-full text-sm">
           <thead className="bg-black/[0.02] text-left text-[var(--muted)]">
             <tr>
               <th className="px-4 py-3">Ref.</th>
+              <th className="px-4 py-3">Tele.Ref.</th>
+              <th className="px-4 py-3">Barras</th>
+              <th className="px-4 py-3">GTIN</th>
               <th className="px-4 py-3">Descrição</th>
+              <th className="px-4 py-3">Composição</th>
+              <th className="px-4 py-3">Un.</th>
               <th className="px-4 py-3">Tipo</th>
               <th className="px-4 py-3">Qtd.</th>
+              <th className="px-4 py-3">Mín.</th>
+              <th className="px-4 py-3">Custo</th>
+              <th className="px-4 py-3">Preço</th>
+              <th className="px-4 py-3">NCM</th>
+              <th className="px-4 py-3">Data Cad.</th>
+              <th className="px-4 py-3">Últ. Atualiz.</th>
               <th className="px-4 py-3">Receita</th>
               <th className="px-4 py-3">Ajustar</th>
             </tr>
@@ -44,10 +55,15 @@ export default async function EstoquePage(props: { searchParams?: Promise<{ q?: 
             {rows.map((p) => (
               <tr key={p.id} className="border-t align-top">
                 <td className="px-4 py-3 font-medium">{p.reference}</td>
+                <td className="px-4 py-3">{p.teleRef ?? "-"}</td>
+                <td className="px-4 py-3">{p.barcode ?? "-"}</td>
+                <td className="px-4 py-3">{p.gtin ?? "-"}</td>
                 <td className="px-4 py-3">
                   <div className="font-semibold">{p.description}</div>
                   <div className="text-xs text-[var(--muted)]">{p.unit}</div>
                 </td>
+                <td className="px-4 py-3 text-xs text-[var(--muted)]">{p.composition ?? "-"}</td>
+                <td className="px-4 py-3">{p.unit}</td>
                 <td className="px-4 py-3">{p.kind}</td>
                 <td
                   className={[
@@ -57,6 +73,12 @@ export default async function EstoquePage(props: { searchParams?: Promise<{ q?: 
                 >
                   {p.stockQty.toFixed(3)}
                 </td>
+                <td className="px-4 py-3">{p.minStock != null ? p.minStock.toFixed(3) : "-"}</td>
+                <td className="px-4 py-3">{p.cost != null ? p.cost.toFixed(4) : "-"}</td>
+                <td className="px-4 py-3">{p.price != null ? p.price.toFixed(4) : "-"}</td>
+                <td className="px-4 py-3">{p.classFiscalNcm ?? "-"}</td>
+                <td className="px-4 py-3">{p.dataCad ?? "-"}</td>
+                <td className="px-4 py-3">{p.ultimaAtualiz ?? "-"}</td>
                 <td className="px-4 py-3">
                   <a
                     className="rounded-xl border bg-[var(--card)] px-3 py-2 text-xs font-semibold hover:bg-black/[0.03]"
