@@ -51,10 +51,14 @@ python3 scripts/extract_pdfs.py --products-pdf "/Users/vitormaria/Downloads/todo
 
 > Atenção: se o PDF tiver dados pessoais de clientes e o repositório estiver público, remova o PDF do GitHub depois de gerar os arquivos JSON.
 
-3) Inicializar o banco SQLite e importar os cadastros
+3) Configurar o Supabase
+
+- Crie o banco no Supabase
+- Copie a `DATABASE_URL` para o `.env`
+- Rode a migração inicial de dados locais uma única vez:
 
 ```bash
-npm run db:reset
+npm run db:migrate:supabase
 ```
 
 4) Rodar em desenvolvimento
@@ -89,10 +93,7 @@ git clone https://github.com/vitormaria1/erp-k2.git .
 # Você pode partir de .env.example e ajustar os valores reais.
 # Se o arquivo .env ainda não existir, o deploy sobe mesmo assim, mas a emissão fiscal fica indisponível até você criá-lo.
 
-# Banco (1ª vez) - ou copie seu erp.db atual para /opt/erp-k2/data/erp.db
-mkdir -p data
 npm ci
-npm run db:migrate
 
 docker compose up -d --build
 ```
@@ -102,17 +103,15 @@ HTTPS:
 
 ## Banco de dados
 
-- Arquivo: `data/erp.db`
-- Config: `.env` com `DATABASE_PATH="data/erp.db"`
+- Banco único: Supabase Postgres via `DATABASE_URL`
+- Migração inicial dos dados locais para o Supabase:
+  - configure `DATABASE_URL` no `.env`
+  - rode `npm run db:migrate:supabase`
+- O esquema do banco fica em `supabase/migrations/0001_customers_products.sql`
 
-## Camada fiscal (PostgreSQL + Focus NFe)
+## Emissão fiscal
 
-- Config: `.env` com `FISCAL_DATABASE_URL="postgres://..."`
-- Postgres local:
-  - Sem Docker: `npm run fiscal:db:pglite` (porta `54323`)
-  - Com Docker: `npm run fiscal:db:up` (porta `54322`)
-- Migração: `npm run fiscal:db:migrate`
-- Emissão:
+- Focus NFe:
   - homologação: `.env` com `FOCUS_NFE_ENV="homologacao"` e `FOCUS_NFE_TOKEN="..."`
   - produção: `.env` com `FOCUS_NFE_ENV="producao"`, `FOCUS_NFE_PROD_UNLOCK="YES"` e o token de produção da Focus
 - Séries/numeração:
@@ -120,8 +119,6 @@ HTTPS:
   - produção: `FISCAL_NFE_SERIE_PROD`, `FISCAL_NFE_START_NUMBER_PROD`
 - Emitente fiscal: `.env` com `FISCAL_ISSUER_*` completos
 - Worker (fila/polling): `npm run fiscal:worker`
-- Seed fiscal inicial: `npm run fiscal:seed -- "NFes_09572986000149_01052026a26052026"`
-- Esse seed usa XMLs só para popular o cadastro fiscal uma vez. A emissão normal passa a ser por pedido e respeita `FOCUS_NFE_ENV`.
 
 ## Próximos passos sugeridos
 

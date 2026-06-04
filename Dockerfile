@@ -27,17 +27,14 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN useradd -m -u 1001 nextjs
 
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/db ./db
-COPY --from=builder /app/data ./seed-data
-COPY --from=builder /app/deploy ./deploy
+COPY --from=builder /app/scripts/pg-db-worker.mjs ./scripts/pg-db-worker.mjs
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 
-# SQLite DB should be mounted to /app/data
 RUN mkdir -p /app/data && chown -R nextjs:nextjs /app
 USER nextjs
 
 EXPOSE 3000
 ENV PORT=3000
 
-CMD ["sh", "-lc", "node /app/deploy/init-db-runtime.mjs && node server.js"]
+CMD ["node", "server.js"]

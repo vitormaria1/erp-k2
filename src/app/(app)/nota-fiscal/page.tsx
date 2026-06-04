@@ -100,7 +100,7 @@ export default async function NotaFiscalPage(props: { searchParams?: Promise<Rec
 
       <div className="mt-4 rounded-2xl border bg-[var(--card)] p-4 text-xs text-[var(--muted)]">
         Emissão assíncrona: após clicar em Emitir, o documento entra em fila e aparece abaixo. Para processar em background e fazer polling automático, rode o worker em outro terminal:{" "}
-        <code>npm run fiscal:worker</code>. (Se você estiver usando <code>FISCAL_DATABASE_URL=pglite:...</code>, evite rodar o worker em outro processo: use o polling inline desta tela.)
+        <code>npm run fiscal:worker</code>.
       </div>
 
       {invoicesError ? (
@@ -108,7 +108,7 @@ export default async function NotaFiscalPage(props: { searchParams?: Promise<Rec
           <div className="font-semibold">Erro ao ler banco fiscal</div>
           <div className="mt-1 text-xs break-words">{invoicesError}</div>
           <div className="mt-2 text-xs text-red-800">
-            Confirme que o <code>pglite-server</code> está rodando na porta <code>54323</code> e que o <code>FISCAL_DATABASE_URL</code> aponta para ele.
+            Confirme que a <code>DATABASE_URL</code> do Supabase está configurada corretamente no ambiente.
           </div>
         </div>
       ) : null}
@@ -133,7 +133,7 @@ export default async function NotaFiscalPage(props: { searchParams?: Promise<Rec
             </button>
           </form>
           <div className="mt-3 text-xs text-[var(--muted)]">
-            Pré-requisitos: `npm run fiscal:db:up` + `npm run fiscal:db:migrate`
+            Pré-requisitos: `DATABASE_URL` configurada no ambiente
           </div>
         </div>
       </div>

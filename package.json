@@ -3,27 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev:fiscal": "pglite-server --db=./data/fiscal-pgdata --host=127.0.0.1 --port=54323 --run \"npm run dev\"",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:init": "tsx scripts/init_db.ts",
-    "db:migrate": "tsx scripts/migrate_db.ts",
-    "fiscal:db:migrate": "tsx scripts/fiscal_migrate_pg.ts",
     "fiscal:worker": "tsx scripts/fiscal_worker.ts",
     "fiscal:seed": "tsx scripts/fiscal_seed.ts",
-    "db:seed-customers-xml": "tsx scripts/seed_customers_from_nfe_xml.ts",
-    "fiscal:db:pglite": "pglite-server --db=./data/fiscal-pgdata --host=127.0.0.1 --port=54323",
-    "fiscal:db:up": "docker compose -f docker-compose.fiscal.yml up -d",
-    "fiscal:db:down": "docker compose -f docker-compose.fiscal.yml down",
-    "db:clean-products": "tsx scripts/clean_products.ts",
-    "db:reset": "rm -f data/erp.db && tsx scripts/init_db.ts && tsx scripts/clean_products.ts"
+    "db:migrate:supabase": "tsx scripts/migrate_customers_products_to_supabase.ts"
   },
   "dependencies": {
     "better-sqlite3": "^12.10.0",
-    "@electric-sql/pglite": "^0.3.6",
-    "@electric-sql/pglite-socket": "^0.0.13",
     "dotenv": "^16.6.1",
     "fast-xml-parser": "^5.2.6",
     "next": "16.2.6",
