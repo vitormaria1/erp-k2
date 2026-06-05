@@ -6,12 +6,29 @@ import { CustomerSelectClient, type CustomerOpt } from "./customer-select-client
 
 function getOptions() {
   const db = getDb();
-  const customers = db
-    .prepare("SELECT id, name, trade_name as tradeName, code, cnpj FROM customers ORDER BY name")
-    .all() as CustomerOpt[];
-  const products = db
-    .prepare("SELECT id, description, reference, unit FROM products ORDER BY description")
-    .all() as ProductOpt[];
+  let customers: CustomerOpt[];
+  let products: ProductOpt[];
+
+  try {
+    customers = db
+      .prepare("SELECT id, name, trade_name as tradeName, code, cnpj FROM customers ORDER BY name")
+      .all() as CustomerOpt[];
+  } catch {
+    customers = db
+      .prepare("SELECT id, name, NULL as tradeName, code, NULL as cnpj FROM customers ORDER BY name")
+      .all() as CustomerOpt[];
+  }
+
+  try {
+    products = db
+      .prepare("SELECT id, description, reference, unit FROM products ORDER BY description")
+      .all() as ProductOpt[];
+  } catch {
+    products = db
+      .prepare("SELECT id, description, id as reference, 'UN' as unit FROM products ORDER BY description")
+      .all() as ProductOpt[];
+  }
+
   return { customers, products };
 }
 
