@@ -75,7 +75,7 @@ function translateSql(sql: string, params: unknown[]): { sql: string; params: un
   }
 
   sql = sql
-    .replace(/datetime\('now'\)/gi, "CURRENT_TIMESTAMP::text")
+    .replace(/datetime\('now'\)/gi, "CURRENT_TIMESTAMP")
     .replace(/date\('now'\)/gi, "CURRENT_DATE")
     .replace(
       /strftime\('%Y-%m',\s*([^)]+?)\s*\)/gi,
