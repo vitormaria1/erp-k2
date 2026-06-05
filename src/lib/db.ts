@@ -77,6 +77,8 @@ function translateSql(sql: string, params: unknown[]): { sql: string; params: un
   sql = sql
     .replace(/datetime\('now'\)/gi, "CURRENT_TIMESTAMP")
     .replace(/date\('now'\)/gi, "CURRENT_DATE")
+    // Preserve camelCase aliases on Postgres. Unquoted identifiers are folded to lowercase.
+    .replace(/\bAS\s+([a-z_][a-z0-9_]*[A-Z][A-Za-z0-9_]*)\b/g, 'AS "$1"')
     .replace(
       /strftime\('%Y-%m',\s*([^)]+?)\s*\)/gi,
       (_match, expr: string) => `to_char((${expr})::timestamp, 'YYYY-MM')`

@@ -21,9 +21,10 @@ export async function POST(req: Request) {
     url.searchParams.set("invoiceId", issued.invoiceId);
     return Response.redirect(url, 303);
   } catch (e) {
-    const msg =
-      e instanceof Error ? `${e.message}${e.stack ? `\n${e.stack}` : ""}` : String(e);
+    const msg = e instanceof Error ? e.message : String(e);
     const ambiente = getConfiguredFocusAmbiente();
-    return new Response(`Falha ao emitir NF-e (${ambiente}): ${msg}`, { status: 500 });
+    const url = new URL("/nota-fiscal", req.url);
+    url.searchParams.set("error", `Falha ao emitir NF-e (${ambiente}): ${msg}`);
+    return Response.redirect(url, 303);
   }
 }
