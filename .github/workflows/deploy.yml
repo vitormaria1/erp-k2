@@ -20,34 +20,30 @@ concurrency:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
+    timeout-minutes: 20
     steps:
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: 2222
-          script: |
-            set -euo pipefail
-            cd /opt/erp-k2
-            git pull --ff-only
+      - name: Deploy on VPS runner
+        env:
+          RESET_SQLITE_DB: ${{ github.event_name == 'workflow_dispatch' && inputs.reset_sqlite_db || 'false' }}
+        run: |
+          set -euo pipefail
+          cd /opt/erp-k2
+          git pull --ff-only
 
-            if [ ! -f .env ]; then
-              echo "Warning: /opt/erp-k2/.env not found. The app will start, but fiscal settings will be empty until you add it."
+          if [ ! -f .env ]; then
+            echo "Warning: /opt/erp-k2/.env not found. The app will start, but fiscal settings will be empty until you add it."
+          fi
+
+          if [ "$RESET_SQLITE_DB" = "true" ]; then
+            echo "Resetting production SQLite database after backup..."
+            docker compose down
+            mkdir -p data
+            if [ -f data/erp.db ]; then
+              cp data/erp.db "data/erp.db.backup-$(date +%Y%m%d-%H%M%S)"
             fi
+            rm -f data/erp.db data/erp.db-*
+          fi
 
-            RESET_SQLITE_DB="${{ github.event_name == 'workflow_dispatch' && inputs.reset_sqlite_db || 'false' }}"
-            if [ "$RESET_SQLITE_DB" = "true" ]; then
-              echo "Resetting production SQLite database after backup..."
-              docker compose down
-              mkdir -p data
-              if [ -f data/erp.db ]; then
-                cp data/erp.db "data/erp.db.backup-$(date +%Y%m%d-%H%M%S)"
-              fi
-              rm -f data/erp.db data/erp.db-*
-            fi
-
-            docker compose up -d --build
-            docker ps
+          docker compose up -d --build
+          docker ps
