@@ -3,6 +3,7 @@ import { createOrderAction } from "./actions";
 import { getDb } from "@/lib/db";
 import { OrderItemsClient, type ProductOpt } from "./order-items-client";
 import { CustomerSelectClient, type CustomerOpt } from "./customer-select-client";
+import { EmitInvoiceSubmitClient } from "./emit-invoice-submit-client";
 
 function getOptions() {
   const db = getDb();
@@ -21,11 +22,11 @@ function getOptions() {
 
   try {
     products = db
-      .prepare("SELECT id, description, reference, unit FROM products ORDER BY description")
+      .prepare('SELECT id, description, reference, unit, price, "Preco Venda" as salePriceRaw FROM products ORDER BY description')
       .all() as ProductOpt[];
   } catch {
     products = db
-      .prepare("SELECT id, description, id as reference, 'UN' as unit FROM products ORDER BY description")
+      .prepare("SELECT id, description, id as reference, 'UN' as unit, NULL as price, NULL as salePriceRaw FROM products ORDER BY description")
       .all() as ProductOpt[];
   }
 
@@ -34,14 +35,15 @@ function getOptions() {
 
 export default function NovoPedidoPage() {
   const { customers, products } = getOptions();
+  const formId = "new-order-form";
   return (
-    <div className="mx-auto max-w-4xl px-6 py-6">
+    <div className="mx-auto max-w-6xl px-6 py-6">
       <h1 className="text-2xl font-semibold">Novo pedido</h1>
       <div className="mt-1 text-sm text-[var(--muted)]">
-        MVP: selecione cliente, adicione itens e crie o pedido.
+        Selecione o cliente, monte os itens e crie o pedido.
       </div>
 
-      <form action={createOrderAction} className="mt-6 space-y-4 rounded-2xl border bg-[var(--card)] p-5">
+      <form id={formId} action={createOrderAction} className="mt-6 space-y-4 rounded-2xl border bg-[var(--card)] p-5">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <label className="space-y-1">
             <div className="text-sm font-semibold">Cliente</div>
@@ -60,14 +62,12 @@ export default function NovoPedidoPage() {
         <div className="rounded-xl border p-4">
           <div className="text-sm font-semibold">Itens</div>
           <div className="mt-2 text-sm text-[var(--muted)]">
-            Por enquanto, adicione 1 item por vez e clique em “Adicionar”.
+            Os produtos ficam carregados em uma lista compacta com rolagem e busca imediata.
           </div>
           <OrderItemsClient products={products} />
         </div>
 
-        <button className="rounded-xl bg-[var(--k2-red-2)] px-5 py-3 text-sm font-semibold text-white">
-          Criar pedido
-        </button>
+        <EmitInvoiceSubmitClient formId={formId} />
       </form>
     </div>
   );

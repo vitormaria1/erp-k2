@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { getDb } from "@/lib/db";
+import { formatDate, formatDateTime } from "@/lib/datetime";
 
 type PurchaseInvoiceRow = {
   id: string;
@@ -71,10 +72,10 @@ export default function ComprasPage() {
           <tbody>
             {invoices.map((r) => (
               <tr key={r.id} className="border-t">
-                <td className="px-4 py-3">{new Date(r.createdAt).toLocaleString("pt-BR")}</td>
+                <td className="px-4 py-3">{formatDateTime(r.createdAt)}</td>
                 <td className="px-4 py-3 font-semibold">{r.supplierName ?? "-"}</td>
                 <td className="px-4 py-3">{r.number ?? "-"}</td>
-                <td className="px-4 py-3">{r.issuedAt ? new Date(r.issuedAt).toLocaleDateString("pt-BR") : "-"}</td>
+                <td className="px-4 py-3">{formatDate(r.issuedAt)}</td>
                 <td className="px-4 py-3">{r.itemsCount}</td>
                 <td className="px-4 py-3 font-semibold">{Number(r.totalQty).toFixed(3)}</td>
               </tr>
@@ -92,4 +93,3 @@ export default function ComprasPage() {
     </div>
   );
 }
-

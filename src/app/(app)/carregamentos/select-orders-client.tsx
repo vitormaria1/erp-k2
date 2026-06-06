@@ -3,6 +3,7 @@
 import * as React from "react";
 
 import { createLoadingAction } from "@/app/(app)/carregamentos/actions";
+import { formatDateTime } from "@/lib/datetime";
 
 export type OrderRow = {
   id: number;
@@ -95,7 +96,7 @@ export function SelectOrdersClient({ orders }: { orders: OrderRow[] }) {
                   </span>
                 </td>
                 <td className="px-4 py-3 text-[var(--muted)]">
-                  {new Date(o.createdAt).toLocaleString("pt-BR")}
+                  {formatDateTime(o.createdAt)}
                 </td>
               </tr>
             ))}
@@ -112,4 +113,3 @@ export function SelectOrdersClient({ orders }: { orders: OrderRow[] }) {
     </>
   );
 }
-

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Image from "next/image";
+import { logoutAction } from "@/app/login/actions";
 
 type NavItem = { href: string; label: string };
 
@@ -64,6 +65,11 @@ export function Sidebar() {
         <div className="rounded-2xl bg-white/10 p-4 text-sm">
           <div className="font-semibold">Vítor S. Maria</div>
           <div className="opacity-80">Administrador</div>
+          <form action={logoutAction} className="mt-4">
+            <button className="w-full cursor-pointer rounded-xl border border-white/16 bg-black/20 px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-white transition hover:bg-black/35">
+              Sair
+            </button>
+          </form>
         </div>
       </div>
     </aside>

@@ -8,6 +8,22 @@ function round2(v: number) {
   return Math.round(v * 100) / 100;
 }
 
+function optionalIbgeCode(v: string | null | undefined) {
+  const digits = String(v ?? "").replace(/[^\d]/g, "");
+  return /^\d{7}$/.test(digits) ? digits : undefined;
+}
+
+function onlyDigits(v: unknown) {
+  return String(v ?? "").replace(/[^\d]/g, "");
+}
+
+function parseOrigem(v: unknown) {
+  const raw = String(v ?? "").trim();
+  const digit = raw.match(/\d/);
+  const n = digit ? Number(digit[0]) : 0;
+  return n >= 0 && n <= 8 ? n : 0;
+}
+
 export class FocusNFePayloadBuilder implements FiscalPayloadBuilder<Record<string, unknown>> {
   constructor(private readonly deps: { productFiscalDataRepo: ProductFiscalDataRepository }) {}
 
@@ -97,6 +113,7 @@ export class FocusNFePayloadBuilder implements FiscalPayloadBuilder<Record<strin
       numero_emitente: draft.issuer.endereco.numero,
       bairro_emitente: draft.issuer.endereco.bairro,
       municipio_emitente: draft.issuer.endereco.municipio,
+      codigo_municipio_emitente: optionalIbgeCode(draft.issuer.endereco.codigoMunicipio),
       uf_emitente: draft.issuer.endereco.uf,
       cep_emitente: draft.issuer.endereco.cep,
       inscricao_estadual_emitente: draft.issuer.ie,
@@ -112,6 +129,7 @@ export class FocusNFePayloadBuilder implements FiscalPayloadBuilder<Record<strin
       numero_destinatario: draft.recipient.endereco.numero,
       bairro_destinatario: draft.recipient.endereco.bairro,
       municipio_destinatario: draft.recipient.endereco.municipio,
+      codigo_municipio_destinatario: optionalIbgeCode(draft.recipient.endereco.codigoMunicipio),
       uf_destinatario: draft.recipient.endereco.uf,
       cep_destinatario: draft.recipient.endereco.cep,
       pais_destinatario: "Brasil",
@@ -160,22 +178,72 @@ async function loadProductFiscalDataViaClient(client: FiscalDbClient, productId:
     tributacao_interestadual: unknown;
   };
   const row = (res.rows[0] as Row | undefined) ?? null;
-  if (!row) return null;
+  if (row) {
+    return {
+      productId: row.product_id,
+      ncm: row.ncm,
+      cest: row.cest,
+      origem: row.origem,
+      unidadeTributavel: row.unidade_tributavel,
+      cstIcms: row.cst_icms,
+      cstPis: row.cst_pis,
+      cstCofins: row.cst_cofins,
+      aliquotaIcms: row.aliquota_icms == null ? undefined : Number(row.aliquota_icms),
+      aliquotaPis: row.aliquota_pis == null ? undefined : Number(row.aliquota_pis),
+      aliquotaCofins: row.aliquota_cofins == null ? undefined : Number(row.aliquota_cofins),
+      cfopPadrao: row.cfop_padrao,
+      beneficiosFiscais: Array.isArray(row.beneficios_fiscais) ? (row.beneficios_fiscais as string[]) : [],
+      tributacaoInterna: (row.tributacao_interna ?? {}) as Record<string, unknown>,
+      tributacaoInterestadual: (row.tributacao_interestadual ?? {}) as Record<string, unknown>,
+    };
+  }
+
+  type ProductRow = {
+    id: string;
+    unit: string | null;
+    ClassFiscalNcm: string | null;
+    CodigoCest: string | null;
+    OrigemMercCst: string | null;
+    UnidadeComercial: string | null;
+  };
+  const fallbackRes = await client.query(
+    `
+    SELECT
+      id,
+      unit,
+      "Class.Fiscal/NCM" as "ClassFiscalNcm",
+      "Código CEST" as "CodigoCest",
+      "Origem Merc. CST" as "OrigemMercCst",
+      "Unidade Comercial" as "UnidadeComercial"
+    FROM products
+    WHERE id = $1
+  `,
+    [productId]
+  );
+  const fallbackRow = (fallbackRes.rows[0] as ProductRow | undefined) ?? null;
+  if (!fallbackRow) return null;
+
+  const ncm = onlyDigits(fallbackRow.ClassFiscalNcm);
+  if (!/^\d{8}$/.test(ncm)) return null;
+
+  const cest = onlyDigits(fallbackRow.CodigoCest);
+  const unidadeTributavel = String(fallbackRow.UnidadeComercial ?? fallbackRow.unit ?? "UN").trim() || "UN";
+
   return {
-    productId: row.product_id,
-    ncm: row.ncm,
-    cest: row.cest,
-    origem: row.origem,
-    unidadeTributavel: row.unidade_tributavel,
-    cstIcms: row.cst_icms,
-    cstPis: row.cst_pis,
-    cstCofins: row.cst_cofins,
-    aliquotaIcms: row.aliquota_icms == null ? undefined : Number(row.aliquota_icms),
-    aliquotaPis: row.aliquota_pis == null ? undefined : Number(row.aliquota_pis),
-    aliquotaCofins: row.aliquota_cofins == null ? undefined : Number(row.aliquota_cofins),
-    cfopPadrao: row.cfop_padrao,
-    beneficiosFiscais: Array.isArray(row.beneficios_fiscais) ? (row.beneficios_fiscais as string[]) : [],
-    tributacaoInterna: (row.tributacao_interna ?? {}) as Record<string, unknown>,
-    tributacaoInterestadual: (row.tributacao_interestadual ?? {}) as Record<string, unknown>,
+    productId: fallbackRow.id,
+    ncm,
+    cest: /^\d{7}$/.test(cest) ? cest : null,
+    origem: parseOrigem(fallbackRow.OrigemMercCst),
+    unidadeTributavel,
+    cstIcms: "00",
+    cstPis: "01",
+    cstCofins: "01",
+    aliquotaIcms: 17,
+    aliquotaPis: 1.65,
+    aliquotaCofins: 7.6,
+    cfopPadrao: "5101",
+    beneficiosFiscais: [],
+    tributacaoInterna: {},
+    tributacaoInterestadual: {},
   };
 }

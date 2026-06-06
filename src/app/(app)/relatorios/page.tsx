@@ -1,4 +1,5 @@
 import { getDb } from "@/lib/db";
+import { formatDateTime, getSaoPauloDateIso } from "@/lib/datetime";
 
 type MovementRow = {
   createdAt: string;
@@ -10,10 +11,6 @@ type MovementRow = {
   reasonCode: string | null;
   note: string | null;
 };
-
-function isoDate(d: Date) {
-  return d.toISOString().slice(0, 10);
-}
 
 function listMovements(from: string, to: string, limit = 500): MovementRow[] {
   const db = getDb();
@@ -71,13 +68,13 @@ export default async function RelatoriosPage(props: {
   searchParams?: Promise<{ from?: string; to?: string }>;
 }) {
   const sp = (await props.searchParams) ?? {};
-  const to = sp.to?.trim() || isoDate(new Date());
+  const to = sp.to?.trim() || getSaoPauloDateIso();
   const from =
     sp.from?.trim() ||
     (() => {
       const d = new Date();
       d.setDate(d.getDate() - 30);
-      return isoDate(d);
+      return getSaoPauloDateIso(d);
     })();
 
   const movements = listMovements(from, to);
@@ -138,7 +135,7 @@ export default async function RelatoriosPage(props: {
           <tbody>
             {movements.map((m, idx) => (
               <tr key={idx} className="border-t">
-                <td className="px-4 py-3">{new Date(m.createdAt).toLocaleString("pt-BR")}</td>
+                <td className="px-4 py-3">{formatDateTime(m.createdAt)}</td>
                 <td className="px-4 py-3 font-medium">{m.reference}</td>
                 <td className="px-4 py-3">
                   <div className="font-semibold">{m.description}</div>

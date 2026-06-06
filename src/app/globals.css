@@ -14,8 +14,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -31,14 +31,79 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
 }
 
 * {
   border-color: var(--border);
 }
 
+.login-shell {
+  background:
+    linear-gradient(135deg, #06070a 0%, #0f1118 38%, #15090a 100%);
+}
+
+.login-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(circle at center, black 42%, transparent 90%);
+}
+
+.login-orb {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(20px);
+  opacity: 0.65;
+  animation: loginFloat 14s ease-in-out infinite;
+}
+
+.login-orb-1 {
+  top: 10%;
+  left: 8%;
+  height: 220px;
+  width: 220px;
+  background: radial-gradient(circle, rgba(245, 179, 1, 0.34) 0%, rgba(245, 179, 1, 0) 72%);
+}
+
+.login-orb-2 {
+  right: 10%;
+  top: 18%;
+  height: 280px;
+  width: 280px;
+  background: radial-gradient(circle, rgba(224, 0, 0, 0.26) 0%, rgba(224, 0, 0, 0) 72%);
+  animation-delay: -4s;
+}
+
+.login-orb-3 {
+  bottom: 7%;
+  left: 34%;
+  height: 240px;
+  width: 240px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0) 74%);
+  animation-delay: -8s;
+}
+
+@keyframes loginFloat {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  33% {
+    transform: translate3d(18px, -22px, 0) scale(1.06);
+  }
+  66% {
+    transform: translate3d(-12px, 18px, 0) scale(0.96);
+  }
+}
+
 @media print {
+  @page {
+    size: A4 portrait;
+    margin: 6mm;
+  }
+
   :root {
     --background: #ffffff;
     --foreground: #000000;
@@ -49,5 +114,20 @@ body {
   body {
     background: #ffffff !important;
     color: #000000 !important;
+  }
+
+  .loading-print-shell {
+    width: 198mm !important;
+    height: 285mm;
+    overflow: hidden;
+    margin: 0 auto;
+    padding: 0 !important;
+    --print-scale: 1;
+  }
+
+  .loading-print-content {
+    width: calc(100% / var(--print-scale));
+    transform: scale(var(--print-scale));
+    transform-origin: top left;
   }
 }

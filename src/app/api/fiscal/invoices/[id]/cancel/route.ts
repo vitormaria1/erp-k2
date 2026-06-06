@@ -1,6 +1,7 @@
 import { withPgTx } from "@/fiscal/persistence/pg/tx";
 import { getFiscalDbPool } from "@/fiscal/infra/pg";
 import { FiscalInvoiceRepositoryPg, FiscalJobRepositoryPg } from "@/fiscal/persistence/pg";
+import { redirectToPublicUrl } from "@/app/api/_utils/public-origin";
 
 export async function POST(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
@@ -31,6 +32,5 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     });
   });
 
-  return Response.redirect(new URL(`/nota-fiscal?invoiceId=${id}`, req.url), 303);
+  return redirectToPublicUrl(req, `/nota-fiscal?invoiceId=${encodeURIComponent(id)}`, 303);
 }
-

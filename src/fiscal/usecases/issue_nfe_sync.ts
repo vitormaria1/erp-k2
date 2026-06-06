@@ -35,7 +35,7 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 
 export async function issueNfeSync(
   input: unknown,
-  opts: { pollMs?: number; maxPolls?: number } = {}
+  opts: { pollMs?: number; maxPolls?: number; sourceOrderId?: number | null } = {}
 ): Promise<IssueNfeSyncResult> {
   const pollMs = opts.pollMs ?? 2000;
   const maxPolls = opts.maxPolls ?? 15;
@@ -75,6 +75,7 @@ export async function issueNfeSync(
 
     const invoice = await invoiceRepo.create({
       client,
+      sourceOrderId: opts.sourceOrderId ?? null,
       issuerCnpj: draft.issuer.cnpj,
       customerId: draft.recipient.customerId,
       model: draft.model,

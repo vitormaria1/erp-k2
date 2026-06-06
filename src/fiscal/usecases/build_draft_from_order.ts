@@ -12,6 +12,11 @@ function onlyDigits(v: string | null | undefined) {
   return String(v ?? "").replace(/[^\d]/g, "");
 }
 
+function asIbgeCityCode(v: string | null | undefined) {
+  const digits = onlyDigits(v);
+  return /^\d{7}$/.test(digits) ? digits : null;
+}
+
 type OrderRow = {
   id: number;
   createdAt: string;
@@ -164,7 +169,7 @@ export async function buildFiscalDraftFromOrder(orderId: number) {
         municipio: issuer.endereco.municipio,
         uf: issuer.endereco.uf,
         cep: issuer.endereco.cep,
-        codigoMunicipio: issuer.endereco.codigoMunicipio ?? null,
+        codigoMunicipio: asIbgeCityCode(issuer.endereco.codigoMunicipio),
       },
     },
 
@@ -180,7 +185,7 @@ export async function buildFiscalDraftFromOrder(orderId: number) {
         municipio: order.city,
         uf: order.uf,
         cep: onlyDigits(order.cep),
-        codigoMunicipio: order.cityCode ? onlyDigits(order.cityCode) : null,
+        codigoMunicipio: asIbgeCityCode(order.cityCode),
       },
       contribuinteIcms: Boolean(order.taxpayer),
     },

@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { getDb } from "@/lib/db";
+import { formatDateTime } from "@/lib/datetime";
 import { cancelProductionOrderAction, completeProductionOrderAction, createProductionOrderAction } from "./actions";
 import { ProductionOrderClient } from "./production-order-client";
 import type { ProductOpt } from "./types";
@@ -94,7 +95,7 @@ export default function ProducaoPage() {
           <tbody>
             {orders.map((o) => (
               <tr key={o.id} className="border-t">
-                <td className="px-4 py-3">{new Date(o.createdAt).toLocaleString("pt-BR")}</td>
+                <td className="px-4 py-3">{formatDateTime(o.createdAt)}</td>
                 <td className="px-4 py-3">
                   <span
                     className={[
@@ -136,7 +137,7 @@ export default function ProducaoPage() {
                       </>
                     ) : (
                       <span className="text-xs text-[var(--muted)]">
-                        Finalizada {o.completedAt ? new Date(o.completedAt).toLocaleString("pt-BR") : ""}
+                        Finalizada {o.completedAt ? formatDateTime(o.completedAt) : ""}
                       </span>
                     )}
                   </div>

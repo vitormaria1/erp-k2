@@ -1,4 +1,5 @@
 import { getDb } from "./db";
+import { getSaoPauloDateIso, getSaoPauloYearMonth } from "./datetime";
 
 export type DashboardMetrics = {
   ordersToday: number;
@@ -77,17 +78,19 @@ export type ProductRecord = Record<string, string | number | null>;
 
 export function getDashboardMetrics(): DashboardMetrics {
   const db = getDb();
+  const today = getSaoPauloDateIso();
+  const currentMonth = getSaoPauloYearMonth();
   const ordersToday =
     (db
-      .prepare("SELECT COUNT(*) as c FROM orders WHERE date(created_at) = date('now')")
-      .get() as { c: number }).c ?? 0;
+      .prepare("SELECT COUNT(*) as c FROM orders WHERE (created_at AT TIME ZONE 'America/Sao_Paulo')::date = ?::date")
+      .get(today) as { c: number }).c ?? 0;
 
   const invoicesToday =
     (db
       .prepare(
-        "SELECT COUNT(*) as c FROM invoices WHERE status = 'ISSUED' AND date(issued_at) = date('now')"
+        "SELECT COUNT(*) as c FROM invoices WHERE status = 'ISSUED' AND (issued_at AT TIME ZONE 'America/Sao_Paulo')::date = ?::date"
       )
-      .get() as { c: number }).c ?? 0;
+      .get(today) as { c: number }).c ?? 0;
 
   const productsCount =
     (db.prepare("SELECT COUNT(*) as c FROM products").get() as { c: number }).c ?? 0;
@@ -95,16 +98,16 @@ export function getDashboardMetrics(): DashboardMetrics {
   const productionToday =
     (db
       .prepare(
-        "SELECT COALESCE(SUM(quantity), 0) as s FROM stock_movements WHERE type = 'IN' AND reason = 'PRODUCTION' AND date(created_at) = date('now')"
+        "SELECT COALESCE(SUM(quantity), 0) as s FROM stock_movements WHERE type = 'IN' AND reason = 'PRODUCTION' AND (created_at AT TIME ZONE 'America/Sao_Paulo')::date = ?::date"
       )
-      .get() as { s: number }).s ?? 0;
+      .get(today) as { s: number }).s ?? 0;
 
   const revenueMonth =
     (db
       .prepare(
-        "SELECT COALESCE(SUM(amount), 0) as s FROM receivables WHERE status IN ('OPEN','PAID') AND strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')"
+        "SELECT COALESCE(SUM(amount), 0) as s FROM receivables WHERE status IN ('OPEN','PAID') AND to_char(created_at AT TIME ZONE 'America/Sao_Paulo', 'YYYY-MM') = ?"
       )
-      .get() as { s: number }).s ?? 0;
+      .get(currentMonth) as { s: number }).s ?? 0;
 
   return { ordersToday, invoicesToday, productsCount, productionToday, revenueMonth };
 }

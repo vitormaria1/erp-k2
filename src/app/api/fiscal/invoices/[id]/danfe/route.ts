@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { withPgTx } from "@/fiscal/persistence/pg/tx";
@@ -10,7 +10,28 @@ function filenameSafe(v: string) {
   return v.replace(/[^A-Za-z0-9._-]+/g, "_");
 }
 
-export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
+async function fileExists(filePath: string) {
+  try {
+    await access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function pdfResponse(pdf: Buffer, filename: string) {
+  const body = new Uint8Array(pdf);
+  return new Response(body, {
+    status: 200,
+    headers: {
+      "content-type": "application/pdf",
+      "content-disposition": `inline; filename="${filename}"`,
+      "cache-control": "private, no-store",
+    },
+  });
+}
+
+export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const pool = getFiscalDbPool();
   const repo = new FiscalInvoiceRepositoryPg();
@@ -20,7 +41,11 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   if (!invoice) return new Response("Not found", { status: 404 });
 
   if (invoice.danfe_pdf_path) {
-    return Response.redirect(new URL(invoice.danfe_pdf_path, req.url), 302);
+    const localPath = path.join(process.cwd(), "public", invoice.danfe_pdf_path.replace(/^\/+/, ""));
+    if (await fileExists(localPath)) {
+      const filename = path.basename(localPath);
+      return pdfResponse(await readFile(localPath), filename);
+    }
   }
 
   if (!invoice.focus_ref) return new Response("Invoice has no focus_ref", { status: 400 });
@@ -45,6 +70,5 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
     await repo.setDanfePdfPath({ client, invoiceId: invoice.id, publicPath });
   });
 
-  return Response.redirect(new URL(publicPath, req.url), 302);
+  return pdfResponse(dl.body, filename);
 }
-

@@ -12,6 +12,7 @@ import {
 import { FocusNFeClient, FocusNFePayloadBuilder } from "../providers/focus";
 import { issueNfe } from "./issue_nfe";
 import { buildFiscalDraftFromOrder } from "./build_draft_from_order";
+import { assertOrderHasNoActiveInvoice } from "./order_invoice_guard";
 
 export async function previewDanfeForOrder(orderId: number): Promise<{ publicPath: string }> {
   const { draft } = await buildFiscalDraftFromOrder(orderId);
@@ -47,8 +48,9 @@ export async function previewDanfeForOrder(orderId: number): Promise<{ publicPat
 }
 
 export async function issueNfeForOrder(orderId: number) {
+  await assertOrderHasNoActiveInvoice(orderId);
   const { draft } = await buildFiscalDraftFromOrder(orderId);
-  return issueNfe(draft);
+  return issueNfe(draft, { sourceOrderId: orderId });
 }
 
 export async function issueNfeForOrderHomologacao(orderId: number) {

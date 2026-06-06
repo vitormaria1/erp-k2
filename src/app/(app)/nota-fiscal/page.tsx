@@ -1,8 +1,9 @@
 import { getFiscalDbPool } from "@/fiscal/infra/pg";
 import { listFiscalInvoices } from "@/fiscal/persistence/pg/dashboard_queries";
+import { formatDateTime } from "@/lib/datetime";
 
-import { seedFromXmlDirAction } from "./actions";
 import { FiscalInlineWorkerClient } from "./inline_worker_client";
+import { AuthorizedInvoiceClient } from "./authorized-invoice-client";
 import Link from "next/link";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +31,8 @@ export default async function NotaFiscalPage(props: { searchParams?: Promise<Rec
   const lastInvoice = invoiceId ? await getInvoiceById(invoiceId).catch(() => null) : null;
   const errorParam = searchParams.error;
   const error = typeof errorParam === "string" ? errorParam : null;
+  const autoPrintParam = searchParams.autoprint;
+  const autoOpenDanfe = autoPrintParam === "1" || autoPrintParam === "true";
 
   const invoicesRes = await (async () => {
     try {
@@ -47,6 +50,13 @@ export default async function NotaFiscalPage(props: { searchParams?: Promise<Rec
   return (
     <div className="mx-auto max-w-6xl px-6 py-6">
       <FiscalInlineWorkerClient />
+      {invoiceId ? (
+        <AuthorizedInvoiceClient
+          invoiceId={invoiceId}
+          internalStatus={typeof lastInvoice?.internal_status === "string" ? lastInvoice.internal_status : null}
+          autoOpenDanfe={autoOpenDanfe}
+        />
+      ) : null}
       <h1 className="text-2xl font-semibold">Nota Fiscal</h1>
 
       {error ? (
@@ -94,6 +104,26 @@ export default async function NotaFiscalPage(props: { searchParams?: Promise<Rec
             <Link className="rounded-lg border px-3 py-1.5 text-xs font-semibold" href="/nota-fiscal">
               Limpar filtro
             </Link>
+            {lastInvoice && lastInvoice.internal_status === "AUTHORIZED" ? (
+              <a
+                className="rounded-lg bg-black px-3 py-1.5 text-xs font-semibold text-white"
+                href={`/api/fiscal/invoices/${lastInvoice.id}/danfe`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Abrir DANFE
+              </a>
+            ) : null}
+            {lastInvoice && lastInvoice.internal_status === "AUTHORIZED" ? (
+              <a
+                className="rounded-lg border px-3 py-1.5 text-xs font-semibold"
+                href={`/api/fiscal/invoices/${lastInvoice.id}/xml`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Baixar XML
+              </a>
+            ) : null}
           </div>
         </div>
       ) : null}
@@ -119,7 +149,7 @@ export default async function NotaFiscalPage(props: { searchParams?: Promise<Rec
           <div className="mt-1 text-xs text-[var(--muted)]">
             Preenche perfil/operação e dados fiscais de produtos no Postgres fiscal.
           </div>
-          <form action={seedFromXmlDirAction} className="mt-3 flex items-end gap-2">
+          <form action="/api/fiscal/seed-xml" method="post" className="mt-3 flex items-end gap-2">
             <div className="flex-1">
               <label className="text-xs text-[var(--muted)]">Pasta de XMLs</label>
               <input
@@ -163,7 +193,7 @@ export default async function NotaFiscalPage(props: { searchParams?: Promise<Rec
               ) : (
                 invoices.map((inv) => (
                   <tr key={inv.id} className="border-t">
-                    <td className="py-2 pr-3">{new Date(inv.created_at).toLocaleString()}</td>
+                    <td className="py-2 pr-3">{formatDateTime(inv.created_at)}</td>
                     <td className="py-2 pr-3">
                       {inv.serie}/{inv.numero ?? "-"}
                     </td>
@@ -176,14 +206,18 @@ export default async function NotaFiscalPage(props: { searchParams?: Promise<Rec
                         <a
                           className="rounded-lg border px-2 py-1 font-semibold"
                           href={`/api/fiscal/invoices/${inv.id}/xml`}
+                          target="_blank"
+                          rel="noreferrer"
                         >
                           XML
                         </a>
                         <a
-                          className="rounded-lg border px-2 py-1 font-semibold"
+                          className="rounded-lg bg-black px-2 py-1 font-semibold text-white"
                           href={`/api/fiscal/invoices/${inv.id}/danfe`}
+                          target="_blank"
+                          rel="noreferrer"
                         >
-                          DANFE
+                          Abrir DANFE
                         </a>
                         {inv.internal_status === "AUTHORIZED" ? (
                           <form action={`/api/fiscal/invoices/${inv.id}/cancel`} method="post">

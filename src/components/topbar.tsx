@@ -1,8 +1,9 @@
 import Link from "next/link";
 import Image from "next/image";
+import { formatLongDate } from "@/lib/datetime";
 
 export function Topbar() {
-  const today = new Intl.DateTimeFormat("pt-BR", { dateStyle: "long" }).format(new Date());
+  const today = formatLongDate(new Date());
   return (
     <header className="flex items-center justify-between gap-4 p-6">
       <div>

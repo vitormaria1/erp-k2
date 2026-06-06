@@ -1,4 +1,5 @@
 import { getDb } from "@/lib/db";
+import { addDaysToIsoDate, startOfSaoPauloWeekIso } from "@/lib/datetime";
 import { RotasBoardClient, type CustomerOpt } from "./rotas-board-client";
 import { moveRouteEntryAction, removeRouteEntryAction, updateRouteEntryAction } from "./actions";
 
@@ -13,26 +14,6 @@ type EntryRow = {
   customerTradeName: string | null;
   customerCode: string;
 };
-
-function isoDate(d: Date) {
-  return d.toISOString().slice(0, 10);
-}
-
-function startOfWeekMondayIso(date = new Date()) {
-  // Monday=1 ... Sunday=0
-  const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  const day = d.getDay(); // 0..6
-  const diff = day === 0 ? -6 : 1 - day;
-  d.setDate(d.getDate() + diff);
-  return isoDate(d);
-}
-
-function addDaysIso(iso: string, days: number) {
-  const d = new Date(iso + "T00:00:00");
-  d.setDate(d.getDate() + days);
-  return isoDate(d);
-}
 
 function getWeek(weekStart: string) {
   const db = getDb();
@@ -87,7 +68,7 @@ function statusClasses(s: EntryRow["status"]) {
 
 export default async function RotasPage(props: { searchParams?: Promise<{ week?: string }> }) {
   const sp = (await props.searchParams) ?? {};
-  const currentWeek = startOfWeekMondayIso();
+  const currentWeek = startOfSaoPauloWeekIso();
   const weekStart = sp.week && /^\d{4}-\d{2}-\d{2}$/.test(sp.week) ? sp.week : currentWeek;
   const { entries } = getWeek(weekStart);
   const customers = listCustomersForRoutes();
@@ -124,13 +105,13 @@ export default async function RotasPage(props: { searchParams?: Promise<{ week?:
           </button>
           <a
             className="rounded-xl border bg-[var(--card)] px-4 py-2 text-sm font-semibold"
-            href={`/rotas?week=${addDaysIso(weekStart, -7)}`}
+            href={`/rotas?week=${addDaysToIsoDate(weekStart, -7)}`}
           >
             ← Semana anterior
           </a>
           <a
             className="rounded-xl border bg-[var(--card)] px-4 py-2 text-sm font-semibold"
-            href={`/rotas?week=${addDaysIso(weekStart, 7)}`}
+            href={`/rotas?week=${addDaysToIsoDate(weekStart, 7)}`}
           >
             Próxima semana →
           </a>
@@ -242,4 +223,3 @@ export default async function RotasPage(props: { searchParams?: Promise<{ week?:
     </div>
   );
 }
-

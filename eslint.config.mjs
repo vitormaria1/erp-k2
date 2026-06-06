@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Runtime/data directories are not source files and may have restricted permissions.
+    "data/fiscal-pgdata/**",
   ]),
 ]);
 

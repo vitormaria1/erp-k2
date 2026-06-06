@@ -29,7 +29,10 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;
 }
 
-export async function issueNfeQuick(input: unknown): Promise<IssueNfeQuickResult> {
+export async function issueNfeQuick(
+  input: unknown,
+  opts: { sourceOrderId?: number | null } = {}
+): Promise<IssueNfeQuickResult> {
   const pool = getFiscalDbPool();
   const focus = new FocusNFeClient();
   const { ambiente } = getFocusEnv();
@@ -65,6 +68,7 @@ export async function issueNfeQuick(input: unknown): Promise<IssueNfeQuickResult
 
     const invoice = await invoiceRepo.create({
       client,
+      sourceOrderId: opts.sourceOrderId ?? null,
       issuerCnpj: draft.issuer.cnpj,
       customerId: draft.recipient.customerId,
       model: draft.model,

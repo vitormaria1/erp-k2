@@ -1,7 +1,7 @@
 import { getFiscalDbPool } from "../infra/pg";
 import { withPgTx } from "../persistence/pg/tx";
 import { FiscalEngine, NoopTaxRuleEngine } from "../engine";
-import { FocusNFeClient, FocusNFePayloadBuilder, getFocusEnv } from "../providers/focus";
+import { FocusNFePayloadBuilder, getFocusEnv } from "../providers/focus";
 import { getNfeDefaults, pickNfeDefaultsByAmbiente } from "../config/nfe_defaults";
 import {
   FiscalInvoiceRepositoryPg,
@@ -23,7 +23,10 @@ function buildFocusRef(args: { issuerCnpj: string; serie: string; numero: number
   return `${args.issuerCnpj}_NFE_${args.serie}_${String(args.numero).padStart(9, "0")}`;
 }
 
-export async function issueNfe(input: unknown): Promise<IssueNfeResult> {
+export async function issueNfe(
+  input: unknown,
+  opts: { sourceOrderId?: number | null } = {}
+): Promise<IssueNfeResult> {
   const pool = getFiscalDbPool();
   const { ambiente } = getFocusEnv();
   const defaults = pickNfeDefaultsByAmbiente(getNfeDefaults(), ambiente);
@@ -46,7 +49,8 @@ export async function issueNfe(input: unknown): Promise<IssueNfeResult> {
   const sequenceRepo = new FiscalSequenceRepositoryPg();
   const invoiceRepo = new FiscalInvoiceRepositoryPg();
   const jobRepo = new FiscalJobRepositoryPg();
-  const focus = new FocusNFeClient();
+  // Validate Focus config at enqueue time so the user gets a deterministic error immediately.
+  getFocusEnv();
 
   return withPgTx(pool, async (client) => {
     const numero = await sequenceRepo.reserveNextNumber({
@@ -60,6 +64,7 @@ export async function issueNfe(input: unknown): Promise<IssueNfeResult> {
 
     const invoice = await invoiceRepo.create({
       client,
+      sourceOrderId: opts.sourceOrderId ?? null,
       issuerCnpj: draft.issuer.cnpj,
       customerId: draft.recipient.customerId,
       model: draft.model,
@@ -78,9 +83,6 @@ export async function issueNfe(input: unknown): Promise<IssueNfeResult> {
       payload: { invoiceId: invoice.id, focusRef, payload, ambiente },
       invoiceId: invoice.id,
     });
-
-    // Touch provider to fail-fast on misconfig (token, env, etc) on first issuance request.
-    void focus;
 
     return { invoiceId: invoice.id, focusRef, serie: draft.serie, numero };
   });

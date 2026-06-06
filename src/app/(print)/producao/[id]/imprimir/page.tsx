@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { PrintButtons, PrintOnLoad } from "@/app/(print)/pedidos/[id]/imprimir/print-client";
 import { getDb } from "@/lib/db";
+import { formatDateTime } from "@/lib/datetime";
 
 type ProductRow = {
   reference: string;
@@ -73,7 +74,7 @@ export default async function PrintProducaoPage({ params }: { params: Promise<{ 
   const data = getPrintable(id);
   if (!data) notFound();
 
-  const created = new Date(data.po.createdAt).toLocaleString("pt-BR");
+  const created = formatDateTime(data.po.createdAt);
 
   return (
     <div className="mx-auto max-w-3xl p-8 print:p-0">

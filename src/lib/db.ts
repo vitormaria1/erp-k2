@@ -31,7 +31,7 @@ type Statement = {
 
 type DbHandle = {
   prepare(sql: string): Statement;
-  transaction<T extends (...args: any[]) => any>(fn: T): (...args: Parameters<T>) => ReturnType<T>;
+  transaction<TArgs extends unknown[], TResult>(fn: (...args: TArgs) => TResult): (...args: TArgs) => TResult;
   exec(sql: string): void;
   close(): void;
 };
@@ -78,7 +78,7 @@ function translateSql(sql: string, params: unknown[]): { sql: string; params: un
     .replace(/datetime\('now'\)/gi, "CURRENT_TIMESTAMP")
     .replace(/date\('now'\)/gi, "CURRENT_DATE")
     // Preserve camelCase aliases on Postgres. Unquoted identifiers are folded to lowercase.
-    .replace(/\bAS\s+([a-z_][a-z0-9_]*[A-Z][A-Za-z0-9_]*)\b/g, 'AS "$1"')
+    .replace(/\bas\s+([a-z_][a-z0-9_]*[A-Z][A-Za-z0-9_]*)\b/gi, 'AS "$1"')
     .replace(
       /strftime\('%Y-%m',\s*([^)]+?)\s*\)/gi,
       (_match, expr: string) => `to_char((${expr})::timestamp, 'YYYY-MM')`
@@ -224,8 +224,10 @@ class PgCompatDb implements DbHandle {
     };
   }
 
-  transaction<T extends (...args: any[]) => any>(fn: T): (...args: Parameters<T>) => ReturnType<T> {
-    return ((...args: Parameters<T>) => {
+  transaction<TArgs extends unknown[], TResult>(
+    fn: (...args: TArgs) => TResult
+  ): (...args: TArgs) => TResult {
+    return ((...args: TArgs) => {
       const begin = this.send({ type: "begin" });
       if (!begin.ok) throw new Error((begin as { ok: false; error: string }).error);
       try {
@@ -240,7 +242,7 @@ class PgCompatDb implements DbHandle {
         }
         throw error;
       }
-    }) as (...args: Parameters<T>) => ReturnType<T>;
+    }) as (...args: TArgs) => TResult;
   }
 
   exec(sql: string) {

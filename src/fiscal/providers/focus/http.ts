@@ -16,7 +16,7 @@ export async function focusFetch(pathname: string, init: RequestInit = {}) {
 
   const timeoutMsRaw = process.env.FOCUS_HTTP_TIMEOUT_MS ?? "15000";
   const timeoutMs = Number(timeoutMsRaw);
-  const ms = Number.isFinite(timeoutMs) ? timeoutMs : 15000;
+  const ms = Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 15000;
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), ms);

@@ -47,7 +47,9 @@ function buildOperationCode(args: { natOp: string; cfop: string; idDest: string 
 
 export async function seedFiscalFromXmlDir(dirRelOrAbs: string): Promise<SeedFromXmlResult> {
   const pool = getFiscalDbPool();
-  const absDir = path.isAbsolute(dirRelOrAbs) ? dirRelOrAbs : path.join(process.cwd(), dirRelOrAbs);
+  const absDir = path.isAbsolute(dirRelOrAbs)
+    ? dirRelOrAbs
+    : path.join(/* turbopackIgnore: true */ process.cwd(), dirRelOrAbs);
   const files = (await readdir(absDir)).filter((f) => f.toLowerCase().endsWith(".xml")).sort();
   if (files.length === 0) throw new Error(`Nenhum XML encontrado em: ${absDir}`);
 

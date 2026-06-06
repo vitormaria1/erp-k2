@@ -1,4 +1,5 @@
 import { getDb } from "@/lib/db";
+import { formatDate } from "@/lib/datetime";
 import { gerarBoletoMockAction } from "./actions";
 
 type Row = {
@@ -63,7 +64,7 @@ export default function FinanceiroPage() {
                 <td className="px-4 py-3">{r.customerName}</td>
                 <td className="px-4 py-3">{r.orderId ? `#${r.orderId}` : "-"}</td>
                 <td className="px-4 py-3">{r.method}</td>
-                <td className="px-4 py-3">{new Date(r.dueDate).toLocaleDateString("pt-BR")}</td>
+                <td className="px-4 py-3">{formatDate(r.dueDate)}</td>
                 <td className="px-4 py-3 font-semibold">{money.format(r.amount)}</td>
                 <td className="px-4 py-3">
                   <span className="rounded-full bg-black/[0.04] px-3 py-1 text-xs font-semibold">

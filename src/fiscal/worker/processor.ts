@@ -35,6 +35,27 @@ function getString(v: unknown, key: string): string | null {
   return isRecord(v) && typeof v[key] === "string" ? (v[key] as string) : null;
 }
 
+function getFocusStatus(body: unknown): string | null {
+  return isRecord(body) && typeof body.status === "string" ? body.status : null;
+}
+
+function mapFocusStatusToInternalStatus(status: string | null) {
+  switch (status) {
+    case "autorizado":
+      return "AUTHORIZED" as const;
+    case "rejeitado":
+      return "REJECTED" as const;
+    case "denegado":
+      return "DENIED" as const;
+    case "cancelado":
+      return "CANCELED" as const;
+    case "erro_autorizacao":
+      return "ERROR" as const;
+    default:
+      return null;
+  }
+}
+
 function asIssuePayload(v: unknown): IssueNfeJobPayload {
   if (!isRecord(v)) throw new Error("Invalid job payload");
   const invoiceId = String(v.invoiceId ?? "");
@@ -112,7 +133,9 @@ export async function processNextFiscalJob(
         });
       });
 
-      if (res.httpStatus === 202 || (isRecord(body) && body.status === "processando_autorizacao")) {
+      const focusStatus = getFocusStatus(body);
+
+      if (res.httpStatus === 202 || focusStatus === "processando_autorizacao") {
         const retryAt = new Date(Date.now() + 10_000);
         await withPgTx(pool, async (client) => {
           await jobRepo.enqueue({
@@ -127,10 +150,9 @@ export async function processNextFiscalJob(
         return { handled: true, jobId: job.id, kind: job.kind };
       }
 
-      if (isRecord(body) && body.status === "autorizado") {
+      if (focusStatus === "autorizado") {
         let xml: string | null = null;
-        const caminho =
-          typeof body.caminho_xml_nota_fiscal === "string" ? body.caminho_xml_nota_fiscal : null;
+        const caminho = getString(body, "caminho_xml_nota_fiscal");
         if (caminho) {
           const dl = await focus.baixarArquivo(caminho);
           if (dl.httpStatus >= 200 && dl.httpStatus < 300) xml = dl.body;
@@ -144,6 +166,15 @@ export async function processNextFiscalJob(
             protocoloAutorizacao: null,
           });
           await invoiceRepo.setInternalStatus({ client, invoiceId, status: "AUTHORIZED" });
+          await jobRepo.markDone({ client, jobId: job.id });
+        });
+        return { handled: true, jobId: job.id, kind: job.kind };
+      }
+
+      const mappedStatus = mapFocusStatusToInternalStatus(focusStatus);
+      if (mappedStatus) {
+        await withPgTx(pool, async (client) => {
+          await invoiceRepo.setInternalStatus({ client, invoiceId, status: mappedStatus });
           await jobRepo.markDone({ client, jobId: job.id });
         });
         return { handled: true, jobId: job.id, kind: job.kind };
@@ -167,6 +198,7 @@ export async function processNextFiscalJob(
 
       const res = await focus.consultarNfe({ ref: focusRef, completa: 0 });
       const body = res.body as unknown;
+      const focusStatus = getFocusStatus(body);
 
       await withPgTx(pool, async (client) => {
         await invoiceRepo.applyFocusResult({
@@ -179,10 +211,9 @@ export async function processNextFiscalJob(
         });
       });
 
-      if (isRecord(body) && body.status === "autorizado") {
+      if (focusStatus === "autorizado") {
         let xml: string | null = null;
-        const caminho =
-          typeof body.caminho_xml_nota_fiscal === "string" ? body.caminho_xml_nota_fiscal : null;
+        const caminho = getString(body, "caminho_xml_nota_fiscal");
         if (caminho) {
           const dl = await focus.baixarArquivo(caminho);
           if (dl.httpStatus >= 200 && dl.httpStatus < 300) xml = dl.body;
@@ -196,7 +227,7 @@ export async function processNextFiscalJob(
         return { handled: true, jobId: job.id, kind: job.kind };
       }
 
-      if (isRecord(body) && body.status === "processando_autorizacao") {
+      if (focusStatus === "processando_autorizacao") {
         const delayS = backoffSeconds(attempts + 1);
         const retryAt = new Date(Date.now() + delayS * 1000);
         await withPgTx(pool, async (client) => {
@@ -211,17 +242,10 @@ export async function processNextFiscalJob(
         return { handled: true, jobId: job.id, kind: job.kind };
       }
 
-      if (isRecord(body) && body.status === "rejeitado") {
+      const mappedStatus = mapFocusStatusToInternalStatus(focusStatus);
+      if (mappedStatus) {
         await withPgTx(pool, async (client) => {
-          await invoiceRepo.setInternalStatus({ client, invoiceId, status: "REJECTED" });
-          await jobRepo.markDone({ client, jobId: job.id });
-        });
-        return { handled: true, jobId: job.id, kind: job.kind };
-      }
-
-      if (isRecord(body) && body.status === "denegado") {
-        await withPgTx(pool, async (client) => {
-          await invoiceRepo.setInternalStatus({ client, invoiceId, status: "DENIED" });
+          await invoiceRepo.setInternalStatus({ client, invoiceId, status: mappedStatus });
           await jobRepo.markDone({ client, jobId: job.id });
         });
         return { handled: true, jobId: job.id, kind: job.kind };

@@ -2,20 +2,41 @@
 
 import * as React from "react";
 
-export type ProductOpt = { id: string; description: string; reference: string; unit: string };
+export type ProductOpt = {
+  id: string;
+  description: string;
+  reference: string;
+  unit: string;
+  price: number | string | null;
+  salePriceRaw?: string | null;
+};
 export type DraftItem = { productId: string; quantity: number; unitPrice?: number };
 
 function normalize(text: string) {
   return text.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
 }
 
+function asPrice(value: number | string | null | undefined) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const normalized = value.replace(/\./g, "").replace(",", ".").trim();
+    const parsed = Number(normalized);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function productDefaultPrice(product: ProductOpt) {
+  return asPrice(product.price) ?? asPrice(product.salePriceRaw);
+}
+
 export function OrderItemsClient({ products }: { products: ProductOpt[] }) {
   const [items, setItems] = React.useState<DraftItem[]>([]);
   const [productId, setProductId] = React.useState("");
   const [productQuery, setProductQuery] = React.useState("");
-  const [productOpen, setProductOpen] = React.useState(false);
   const [quantity, setQuantity] = React.useState("1");
   const [unitPrice, setUnitPrice] = React.useState("");
+  const deferredQuery = React.useDeferredValue(productQuery);
 
   const productMap = React.useMemo(() => {
     const map = new Map<string, ProductOpt>();
@@ -24,26 +45,30 @@ export function OrderItemsClient({ products }: { products: ProductOpt[] }) {
   }, [products]);
 
   const filteredProducts = React.useMemo(() => {
-    const q = normalize(productQuery.trim());
-    if (!q) return products.slice(0, 60);
-    const out: ProductOpt[] = [];
-    for (const p of products) {
-      const hay = normalize([p.description, p.reference].join(" "));
-      if (hay.includes(q)) out.push(p);
-      if (out.length >= 60) break;
-    }
-    return out;
-  }, [products, productQuery]);
+    const q = normalize(deferredQuery.trim());
+    if (!q) return products;
+    return products.filter((p) => normalize([p.description, p.reference, p.id].join(" ")).includes(q));
+  }, [products, deferredQuery]);
 
   const selectedProduct = React.useMemo(() => {
     if (!productId) return null;
     return productMap.get(productId) ?? null;
   }, [productId, productMap]);
+  const orderTotal = React.useMemo(
+    () => items.reduce((acc, item) => acc + (item.unitPrice ?? 0) * item.quantity, 0),
+    [items]
+  );
 
   function selectProduct(p: ProductOpt) {
     setProductId(p.id);
-    setProductQuery(`${p.description} (${p.reference})`);
-    setProductOpen(false);
+    const defaultPrice = productDefaultPrice(p);
+    setUnitPrice(defaultPrice == null ? "" : String(defaultPrice));
+  }
+
+  function handleEditorKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    if (selectedProduct) addItem();
   }
 
   function addItem() {
@@ -53,7 +78,6 @@ export function OrderItemsClient({ products }: { products: ProductOpt[] }) {
     const price = unitPrice.trim().length ? Number(unitPrice) : undefined;
     setItems((prev) => [...prev, { productId, quantity: qty, unitPrice: price }]);
     setProductId("");
-    setProductQuery("");
     setQuantity("1");
     setUnitPrice("");
   }
@@ -66,86 +90,128 @@ export function OrderItemsClient({ products }: { products: ProductOpt[] }) {
     <div className="mt-3 space-y-3">
       <input type="hidden" name="itemsJson" value={JSON.stringify(items)} />
 
-      <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
-        <div className="relative md:col-span-2">
-          <input type="hidden" value={productId} />
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.85fr)]">
+        <div className="rounded-2xl border bg-black/[0.015] p-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold">Produtos</div>
+              <div className="text-xs text-[var(--muted)]">
+                Digite por nome, c&oacute;digo ou refer&ecirc;ncia. A lista filtra a cada letra.
+              </div>
+            </div>
+            <div className="text-xs text-[var(--muted)]">{filteredProducts.length} itens</div>
+          </div>
+
           <input
-            className="w-full rounded-xl border bg-[var(--card)] px-3 py-2 text-sm"
-            placeholder="Buscar item por descrição ou referência..."
+            className="mt-3 w-full rounded-xl border bg-[var(--card)] px-3 py-2 text-sm"
+            placeholder="Buscar item por descri&ccedil;&atilde;o, refer&ecirc;ncia ou c&oacute;digo..."
             value={productQuery}
-            onChange={(e) => {
-              setProductQuery(e.target.value);
-              setProductOpen(true);
-              setProductId("");
-            }}
-            onFocus={() => setProductOpen(true)}
-            onBlur={() => {
-              window.setTimeout(() => setProductOpen(false), 150);
+            onChange={(e) => setProductQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.preventDefault();
             }}
             aria-label="Buscar item"
           />
-          {productOpen ? (
-            <div className="absolute z-20 mt-2 max-h-72 w-full overflow-auto rounded-2xl border bg-[var(--card)] shadow-lg">
-              {filteredProducts.length === 0 ? (
-                <div className="px-3 py-2 text-sm text-[var(--muted)]">
-                  Nenhum item encontrado.
-                </div>
-              ) : (
-                <ul className="py-2">
-                  {filteredProducts.map((p) => (
+          <div className="mt-3 max-h-80 overflow-y-auto rounded-2xl border bg-[var(--card)]">
+            {filteredProducts.length === 0 ? (
+              <div className="px-3 py-8 text-center text-sm text-[var(--muted)]">
+                Nenhum item encontrado.
+              </div>
+            ) : (
+              <ul className="divide-y divide-black/5">
+                {filteredProducts.map((p) => {
+                  const isSelected = p.id === productId;
+                  return (
                     <li key={p.id}>
                       <button
                         type="button"
-                        onMouseDown={(e) => e.preventDefault()}
                         onClick={() => selectProduct(p)}
-                        className="w-full px-3 py-2 text-left text-sm hover:bg-black/[0.03]"
+                        className={`w-full px-3 py-2.5 text-left text-sm transition ${
+                          isSelected ? "bg-[var(--k2-red-2)]/8" : "hover:bg-black/[0.03]"
+                        }`}
                       >
-                        <div className="font-semibold">{p.description}</div>
-                        <div className="mt-0.5 text-xs text-[var(--muted)]">
-                          {p.reference} · {p.unit}
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="truncate font-semibold">{p.description}</div>
+                            <div className="mt-0.5 text-xs text-[var(--muted)]">
+                              {p.reference} · {p.unit}
+                              {productDefaultPrice(p) != null ? ` · R$ ${productDefaultPrice(p)!.toFixed(2)}` : ""}
+                            </div>
+                          </div>
+                          {isSelected ? (
+                            <span className="rounded-full bg-[var(--k2-red-2)] px-2 py-0.5 text-[10px] font-semibold text-white">
+                              Selecionado
+                            </span>
+                          ) : null}
                         </div>
                       </button>
                     </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ) : null}
-          {selectedProduct ? (
-            <div className="mt-2 text-xs text-[var(--muted)]">
-              Selecionado:{" "}
-              <span className="font-semibold text-[var(--foreground)]">
-                {selectedProduct.description} ({selectedProduct.reference})
-              </span>
-            </div>
-          ) : null}
+                  );
+                })}
+              </ul>
+            )}
+          </div>
         </div>
-        <input
-          className="rounded-xl border bg-[var(--card)] px-3 py-2 text-sm"
-          type="number"
-          min="0"
-          step="0.001"
-          value={quantity}
-          onChange={(e) => setQuantity(e.target.value)}
-          placeholder="Qtd"
-        />
-        <input
-          className="rounded-xl border bg-[var(--card)] px-3 py-2 text-sm"
-          type="number"
-          min="0"
-          step="0.01"
-          value={unitPrice}
-          onChange={(e) => setUnitPrice(e.target.value)}
-          placeholder="Preço (R$)"
-        />
+
+        <div className="rounded-2xl border bg-[var(--card)] p-4">
+          {selectedProduct ? (
+            <div className="rounded-2xl border bg-black/[0.02] p-3">
+              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">
+                Produto selecionado
+              </div>
+              <div className="mt-1 text-sm font-semibold">{selectedProduct.description}</div>
+              <div className="mt-1 text-xs text-[var(--muted)]">
+                {selectedProduct.reference} · {selectedProduct.unit}
+                {productDefaultPrice(selectedProduct) != null
+                  ? ` · Preço padrão R$ ${productDefaultPrice(selectedProduct)!.toFixed(2)}`
+                  : ""}
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed p-4 text-sm text-[var(--muted)]">
+              Selecione um produto na lista ao lado.
+            </div>
+          )}
+
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <label className="space-y-1">
+              <div className="text-xs font-semibold text-[var(--muted)]">Quantidade</div>
+              <input
+                className="w-full rounded-xl border bg-[var(--card)] px-3 py-2 text-sm"
+                type="number"
+                min="0"
+                step="0.001"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                onKeyDown={handleEditorKeyDown}
+                placeholder="Qtd"
+              />
+            </label>
+            <label className="space-y-1">
+              <div className="text-xs font-semibold text-[var(--muted)]">Pre&ccedil;o unit&aacute;rio</div>
+              <input
+                className="w-full rounded-xl border bg-[var(--card)] px-3 py-2 text-sm"
+                type="number"
+                min="0"
+                step="0.01"
+                value={unitPrice}
+                onChange={(e) => setUnitPrice(e.target.value)}
+                onKeyDown={handleEditorKeyDown}
+                placeholder="R$ 0,00"
+              />
+            </label>
+          </div>
+
+          <button
+            type="button"
+            onClick={addItem}
+            disabled={!selectedProduct}
+            className="mt-4 w-full rounded-xl bg-black px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Adicionar item
+          </button>
+        </div>
       </div>
-      <button
-        type="button"
-        onClick={addItem}
-        className="rounded-xl border bg-black px-4 py-2 text-sm font-semibold text-white"
-      >
-        Adicionar
-      </button>
 
       <div className="overflow-hidden rounded-xl border">
         <table className="w-full text-sm">
@@ -199,6 +265,11 @@ export function OrderItemsClient({ products }: { products: ProductOpt[] }) {
             ) : null}
           </tbody>
         </table>
+      </div>
+
+      <div className="flex items-center justify-between rounded-2xl border bg-black/[0.03] px-4 py-3">
+        <div className="text-sm text-[var(--muted)]">Total atual do pedido</div>
+        <div className="text-lg font-semibold">R$ {orderTotal.toFixed(2)}</div>
       </div>
     </div>
   );

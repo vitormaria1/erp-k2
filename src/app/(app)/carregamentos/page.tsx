@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { getDb } from "@/lib/db";
+import { formatDateTime } from "@/lib/datetime";
 import { SelectOrdersClient, type OrderRow } from "./select-orders-client";
 
 type Row = {
@@ -85,7 +86,7 @@ export default function CarregamentosPage() {
           <tbody>
             {rows.map((r) => (
               <tr key={r.id} className="border-t">
-                <td className="px-4 py-3">{new Date(r.createdAt).toLocaleString("pt-BR")}</td>
+                <td className="px-4 py-3">{formatDateTime(r.createdAt)}</td>
                 <td className="px-4 py-3 font-semibold">{r.ordersCount}</td>
                 <td className="px-4 py-3 text-[var(--muted)]">{r.notes ?? "-"}</td>
                 <td className="px-4 py-3">

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { PrintButtons, PrintOnLoad } from "./print-client";
 import { getDb } from "@/lib/db";
+import { formatDateTime } from "@/lib/datetime";
 
 type ItemRow = {
   code: string;
@@ -77,7 +78,7 @@ export default async function PrintPedidoPage({
   const { order, items, grandTotal } = data;
 
   const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
-  const created = new Date(order.createdAt).toLocaleString("pt-BR");
+  const created = formatDateTime(order.createdAt);
 
   return (
     <div className="mx-auto max-w-3xl p-8 print:p-0">

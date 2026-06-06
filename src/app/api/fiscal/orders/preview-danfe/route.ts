@@ -1,4 +1,5 @@
 import { previewDanfeForOrder } from "@/fiscal/usecases/nfe_from_order";
+import { redirectToPublicUrl } from "@/app/api/_utils/public-origin";
 
 export async function POST(req: Request) {
   try {
@@ -9,7 +10,7 @@ export async function POST(req: Request) {
     }
 
     const { publicPath } = await previewDanfeForOrder(orderId);
-    return Response.redirect(new URL(publicPath, req.url), 303);
+    return redirectToPublicUrl(req, publicPath, 303);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return new Response(`Falha no preview DANFE: ${msg}`, { status: 500 });
