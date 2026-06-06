@@ -22,7 +22,9 @@ export default async function ClientesPage(props: {
     if (tracks === "no" && row.tracksOrders) return false;
     return true;
   });
-  const ufOptions = Array.from(new Set(baseRows.map((row) => row.uf).filter(Boolean))).sort();
+  const ufOptions = Array.from(
+    new Set(baseRows.map((row) => row.uf).filter((ufValue): ufValue is string => Boolean(ufValue)))
+  ).sort();
   const summary = {
     total: rows.length,
     blocked: rows.filter((row) => Boolean(row.blocked)).length,
