@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { getDb } from "@/lib/db";
 import { parseAppDate } from "@/lib/datetime";
-import { formatDateTime, getSaoPauloDateIso } from "@/lib/datetime";
+import { formatDateTime, getSaoPauloDateIso, getSaoPauloYearMonth } from "@/lib/datetime";
 import { getFiscalDbPool } from "@/fiscal/infra/pg";
 import { getConfiguredFocusAmbiente } from "@/fiscal/providers/focus";
 
@@ -15,6 +15,7 @@ type Row = {
   createdAt: string;
   status: OrderStatus;
   customerName: string;
+  notes: string | null;
   itemsCount: number;
   totalAmount: number;
   customerAddressOk: boolean;
@@ -26,6 +27,9 @@ type QueryFilters = {
   q: string;
   status: string;
   fiscal: string;
+  period: string;
+  from: string;
+  to: string;
 };
 
 type FiscalInvoiceSummary = {
@@ -70,11 +74,6 @@ async function listOrders(filters: QueryFilters, limit = 200): Promise<Row[]> {
   const where: string[] = [];
   const params: Array<string | number> = [];
 
-  if (filters.q) {
-    where.push("(c.name LIKE ? OR CAST(o.id AS TEXT) LIKE ? OR COALESCE(o.notes, '') LIKE ?)");
-    params.push(`%${filters.q}%`, `%${filters.q}%`, `%${filters.q}%`);
-  }
-
   if (filters.status && ORDER_STATUS_VALUES.includes(filters.status as OrderStatus)) {
     where.push("o.status = ?");
     params.push(filters.status);
@@ -86,6 +85,7 @@ async function listOrders(filters: QueryFilters, limit = 200): Promise<Row[]> {
       o.created_at as createdAt,
       o.status as status,
       c.name as customerName,
+      o.notes as notes,
       c.street as customerStreet,
       c.number as customerNumber,
       c.neighborhood as customerNeighborhood,
@@ -110,6 +110,7 @@ async function listOrders(filters: QueryFilters, limit = 200): Promise<Row[]> {
     createdAt: string;
     status: string;
     customerName: string;
+    notes: string | null;
     customerStreet: string | null;
     customerNumber: string | null;
     customerNeighborhood: string | null;
@@ -129,6 +130,7 @@ async function listOrders(filters: QueryFilters, limit = 200): Promise<Row[]> {
     createdAt: row.createdAt,
     status: normalizeOrderStatus(row.status) as OrderStatus,
     customerName: row.customerName,
+    notes: row.notes,
     itemsCount: row.itemsCount,
     totalAmount: Number(row.totalAmount ?? 0),
     customerAddressOk:
@@ -142,12 +144,101 @@ async function listOrders(filters: QueryFilters, limit = 200): Promise<Row[]> {
     fiscalAvailable,
   }));
 
-  if (!filters.fiscal) return filtered;
+  const { from, to } = resolveDateRange(filters);
+  const textFiltered = filters.q ? filtered.filter((row) => matchesOrderQuery(row, filters.q)) : filtered;
+  const dateFiltered =
+    from || to
+      ? textFiltered.filter((row) => isOrderWithinDateRange(row, from, to))
+      : textFiltered;
 
-  return filtered.filter((row) => {
+  if (!filters.fiscal) return dateFiltered;
+
+  return dateFiltered.filter((row) => {
     const meta = getFiscalBucket(row.fiscal, row.fiscalAvailable);
     return meta === filters.fiscal;
   });
+}
+
+function resolveDateRange(filters: Pick<QueryFilters, "period" | "from" | "to">) {
+  if (filters.period === "custom") {
+    return { from: filters.from, to: filters.to };
+  }
+
+  const today = getSaoPauloDateIso();
+  if (filters.period === "today") {
+    return { from: today, to: today };
+  }
+  if (filters.period === "last7") {
+    const date = new Date(`${today}T12:00:00Z`);
+    date.setUTCDate(date.getUTCDate() - 6);
+    return { from: getSaoPauloDateIso(date), to: today };
+  }
+  if (filters.period === "month") {
+    const yearMonth = getSaoPauloYearMonth();
+    return { from: `${yearMonth}-01`, to: today };
+  }
+  return { from: filters.from, to: filters.to };
+}
+
+function matchesOrderQuery(order: Row, query: string) {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+
+  const created = parseAppDate(order.createdAt);
+  const createdIso = created ? getSaoPauloDateIso(created) : "";
+  const createdMonth = created ? getSaoPauloYearMonth(created) : "";
+  const searchable = [
+    order.customerName,
+    order.notes ?? "",
+    String(order.id),
+    `#${order.id}`,
+    createdIso,
+    createdMonth,
+    formatDateTime(order.createdAt),
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  return searchable.includes(q);
+}
+
+function isOrderWithinDateRange(order: Row, from: string, to: string) {
+  const created = parseAppDate(order.createdAt);
+  if (!created) return false;
+  const iso = getSaoPauloDateIso(created);
+  if (from && iso < from) return false;
+  if (to && iso > to) return false;
+  return true;
+}
+
+function listOrderSearchSuggestions(limit = 120) {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `
+      SELECT
+        o.id as id,
+        o.created_at as createdAt,
+        c.name as customerName
+      FROM orders o
+      JOIN customers c ON c.id = o.customer_id
+      ORDER BY o.created_at DESC
+      LIMIT ?
+    `
+    )
+    .all(limit) as Array<{ id: number; createdAt: string; customerName: string }>;
+
+  const suggestions = new Set<string>();
+  for (const row of rows) {
+    suggestions.add(row.customerName);
+    suggestions.add(`#${row.id}`);
+    const created = parseAppDate(row.createdAt);
+    if (created) {
+      suggestions.add(getSaoPauloDateIso(created));
+      suggestions.add(getSaoPauloYearMonth(created));
+    }
+  }
+  return Array.from(suggestions).slice(0, limit);
 }
 
 async function loadFiscalInvoicesByOrderId(orderIds: number[]) {
@@ -310,16 +401,27 @@ function MiniBarChart(props: { title: string; items: Array<{ label: string; valu
 }
 
 export default async function PedidosPage(props: {
-  searchParams?: Promise<{ q?: string; status?: string; fiscal?: string }>;
+  searchParams?: Promise<{
+    q?: string;
+    status?: string;
+    fiscal?: string;
+    period?: string;
+    from?: string;
+    to?: string;
+  }>;
 }) {
   const sp = (await props.searchParams) ?? {};
   const filters: QueryFilters = {
     q: sp.q?.trim() ?? "",
     status: sp.status?.trim() ?? "",
     fiscal: sp.fiscal?.trim() ?? "",
+    period: sp.period?.trim() ?? "",
+    from: sp.from?.trim() ?? "",
+    to: sp.to?.trim() ?? "",
   };
 
   const orders = await listOrders(filters);
+  const suggestions = listOrderSearchSuggestions();
   const summary = summarizeOrders(orders);
   const ambiente = getConfiguredFocusAmbiente();
   const fiscalLabel = ambiente === "producao" ? "P" : "H";
@@ -343,13 +445,19 @@ export default async function PedidosPage(props: {
       </div>
 
       <form action="/pedidos" method="GET" className="mt-6 rounded-2xl border bg-[var(--card)] p-5 shadow-sm">
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[1.5fr_220px_220px_auto]">
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.4fr_180px_180px_180px_170px_170px_auto]">
           <input
             name="q"
+            list="pedidos-search-suggestions"
             defaultValue={filters.q}
-            placeholder="Buscar por cliente, numero do pedido ou observacao"
+            placeholder="Buscar por cliente, pedido, mês ou data"
             className="rounded-xl border bg-[var(--card)] px-4 py-3 text-sm"
           />
+          <datalist id="pedidos-search-suggestions">
+            {suggestions.map((suggestion) => (
+              <option key={suggestion} value={suggestion} />
+            ))}
+          </datalist>
           <select
             name="status"
             defaultValue={filters.status}
@@ -375,6 +483,29 @@ export default async function PedidosPage(props: {
             <option value="CANCELED">Cancelada</option>
             <option value="UNAVAILABLE">Fiscal indisponivel</option>
           </select>
+          <select
+            name="period"
+            defaultValue={filters.period}
+            className="rounded-xl border bg-[var(--card)] px-4 py-3 text-sm"
+          >
+            <option value="">Todo período</option>
+            <option value="today">Hoje</option>
+            <option value="last7">Últimos 7 dias</option>
+            <option value="month">Mês atual</option>
+            <option value="custom">Período personalizado</option>
+          </select>
+          <input
+            name="from"
+            type="date"
+            defaultValue={filters.from}
+            className="rounded-xl border bg-[var(--card)] px-4 py-3 text-sm"
+          />
+          <input
+            name="to"
+            type="date"
+            defaultValue={filters.to}
+            className="rounded-xl border bg-[var(--card)] px-4 py-3 text-sm"
+          />
           <div className="flex gap-2">
             <button className="rounded-xl bg-black px-4 py-3 text-sm font-semibold text-white">Filtrar</button>
             <Link href="/pedidos" className="rounded-xl border px-4 py-3 text-sm font-semibold">
