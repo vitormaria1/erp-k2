@@ -321,8 +321,6 @@ function summarizeOrders(orders: Row[]) {
   const totalValue = orders.reduce((sum, order) => sum + order.totalAmount, 0);
   const paidCount = orders.filter((order) => order.status === "PAGO").length;
   const deliveredCount = orders.filter((order) => order.status === "ENTREGUE").length;
-  const authorizedCount = orders.filter((order) => order.fiscal?.internalStatus === "AUTHORIZED").length;
-  const pendingFiscalCount = orders.filter((order) => !order.fiscal).length;
 
   const statusBars = ORDER_STATUS_VALUES.map((status) => {
     const count = orders.filter((order) => order.status === status).length;
@@ -357,8 +355,6 @@ function summarizeOrders(orders: Row[]) {
     totalValue,
     paidCount,
     deliveredCount,
-    authorizedCount,
-    pendingFiscalCount,
     statusBars,
     fiscalBars,
     last7Days,
@@ -411,11 +407,12 @@ export default async function PedidosPage(props: {
   }>;
 }) {
   const sp = (await props.searchParams) ?? {};
+  const hasExplicitDateFilter = !!(sp.period || sp.from || sp.to);
   const filters: QueryFilters = {
     q: sp.q?.trim() ?? "",
     status: sp.status?.trim() ?? "",
     fiscal: sp.fiscal?.trim() ?? "",
-    period: sp.period?.trim() ?? "",
+    period: sp.period?.trim() || (hasExplicitDateFilter ? "" : "today"),
     from: sp.from?.trim() ?? "",
     to: sp.to?.trim() ?? "",
   };
@@ -430,7 +427,7 @@ export default async function PedidosPage(props: {
   const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
   return (
-    <div className="mx-auto max-w-7xl px-6 py-6">
+    <div className="mx-auto w-full max-w-[1560px] px-4 py-6 sm:px-6 lg:px-8">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Pedidos</h1>
@@ -444,8 +441,8 @@ export default async function PedidosPage(props: {
         </Link>
       </div>
 
-      <form action="/pedidos" method="GET" className="mt-6 rounded-2xl border bg-[var(--card)] p-5 shadow-sm">
-        <div className="grid grid-cols-1 gap-3 xl:grid-cols-[1.4fr_180px_180px_180px_170px_170px_auto]">
+      <form action="/pedidos" method="GET" className="mt-6 rounded-2xl border bg-[var(--card)] p-4 shadow-sm sm:p-5">
+        <div className="grid grid-cols-1 gap-3 2xl:grid-cols-[minmax(260px,1.5fr)_170px_170px_180px_160px_160px_auto]">
           <input
             name="q"
             list="pedidos-search-suggestions"
@@ -506,21 +503,20 @@ export default async function PedidosPage(props: {
             defaultValue={filters.to}
             className="rounded-xl border bg-[var(--card)] px-4 py-3 text-sm"
           />
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button className="rounded-xl bg-black px-4 py-3 text-sm font-semibold text-white">Filtrar</button>
-            <Link href="/pedidos" className="rounded-xl border px-4 py-3 text-sm font-semibold">
+            <Link href="/pedidos?period=today" className="rounded-xl border px-4 py-3 text-sm font-semibold">
               Limpar
             </Link>
           </div>
         </div>
       </form>
 
-      <section className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+      <section className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Pedidos filtrados" value={String(orders.length)} sub="Resultado atual da busca" />
         <StatCard label="Valor total" value={money.format(summary.totalValue)} sub="Soma dos pedidos listados" />
         <StatCard label="Pedidos pagos" value={String(summary.paidCount)} sub="Status operacional pago" />
         <StatCard label="Pedidos entregues" value={String(summary.deliveredCount)} sub="Prontos no ciclo logistico" />
-        <StatCard label="NF-e autorizadas" value={String(summary.authorizedCount)} sub={`${summary.pendingFiscalCount} ainda sem NF-e`} />
       </section>
 
       <section className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-[1.3fr_1fr_1fr]">
@@ -577,8 +573,8 @@ export default async function PedidosPage(props: {
         />
       </section>
 
-      <div className="mt-6 overflow-hidden rounded-2xl border bg-[var(--card)] shadow-sm">
-        <table className="w-full text-sm">
+      <div className="mt-6 overflow-x-auto rounded-2xl border bg-[var(--card)] shadow-sm">
+        <table className="min-w-[980px] w-full text-sm">
           <thead className="bg-black/[0.02] text-left text-[var(--muted)]">
             <tr>
               <th className="px-4 py-3">#</th>
