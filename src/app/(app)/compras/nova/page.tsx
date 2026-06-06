@@ -4,6 +4,9 @@ import { getDb } from "@/lib/db";
 import { createPurchaseInvoiceAction } from "./actions";
 import { PurchaseItemsClient, type ProductOpt } from "./purchase-items-client";
 
+const PRODUCT_REFERENCE_ORDER_SQL =
+  "CASE WHEN NULLIF(BTRIM(reference), '') ~ '^[0-9]+$' THEN reference::bigint END NULLS LAST, reference ASC";
+
 function listProducts(): ProductOpt[] {
   const db = getDb();
   return db
@@ -11,7 +14,7 @@ function listProducts(): ProductOpt[] {
       `
       SELECT id, reference, description, unit
       FROM products
-      ORDER BY CAST(reference AS INTEGER) ASC, reference ASC
+      ORDER BY ${PRODUCT_REFERENCE_ORDER_SQL}
     `
     )
     .all() as ProductOpt[];
@@ -79,4 +82,3 @@ export default function NovaCompraPage() {
     </div>
   );
 }
-

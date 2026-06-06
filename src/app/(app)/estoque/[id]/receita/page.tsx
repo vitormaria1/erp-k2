@@ -21,6 +21,9 @@ type RecipeRow = {
   inputCost: number | null;
 };
 
+const PRODUCT_REFERENCE_ORDER_SQL =
+  "CASE WHEN NULLIF(BTRIM(reference), '') ~ '^[0-9]+$' THEN reference::bigint END NULLS LAST, reference ASC";
+
 function getData(productId: string) {
   const db = getDb();
   const product = db
@@ -41,7 +44,7 @@ function getData(productId: string) {
       FROM product_recipes r
       JOIN products p2 ON p2.id = r.input_product_id
       WHERE r.product_id = ?
-      ORDER BY CAST(p2.reference AS INTEGER) ASC, p2.reference ASC
+      ORDER BY CASE WHEN NULLIF(BTRIM(p2.reference), '') ~ '^[0-9]+$' THEN p2.reference::bigint END NULLS LAST, p2.reference ASC
     `
     )
     .all(productId) as RecipeRow[];
@@ -52,7 +55,7 @@ function getData(productId: string) {
       SELECT id, reference, description, unit
       FROM products
       WHERE id != ? AND unit = 'KG'
-      ORDER BY CAST(reference AS INTEGER) ASC, reference ASC
+      ORDER BY ${PRODUCT_REFERENCE_ORDER_SQL}
     `
     )
     .all(productId) as InputProductOpt[];

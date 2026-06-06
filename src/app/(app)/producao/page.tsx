@@ -25,6 +25,9 @@ type InputUsageRow = {
   estimatedCost: number;
 };
 
+const PRODUCT_REFERENCE_ORDER_SQL =
+  "CASE WHEN NULLIF(BTRIM(reference), '') ~ '^[0-9]+$' THEN reference::bigint END NULLS LAST, reference ASC";
+
 function listProductionOrders(opts: { q?: string; status?: string; limit?: number } = {}): ProductionOrderRow[] {
   const db = getDb();
   const q = (opts.q ?? "").trim();
@@ -84,7 +87,7 @@ function listProductsForProduction(): ProductOpt[] {
       `
       SELECT id, reference, description, unit
       FROM products
-      ORDER BY CAST(reference AS INTEGER) ASC, reference ASC
+      ORDER BY ${PRODUCT_REFERENCE_ORDER_SQL}
     `
     )
     .all() as ProductOpt[];

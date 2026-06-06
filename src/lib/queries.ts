@@ -76,6 +76,12 @@ export type ProductRow = {
 
 export type ProductRecord = Record<string, string | number | null>;
 
+const CUSTOMER_CODE_ORDER_SQL =
+  "CASE WHEN NULLIF(BTRIM(code), '') ~ '^[0-9]+$' THEN code::bigint END NULLS LAST, code ASC";
+
+const PRODUCT_REFERENCE_ORDER_SQL =
+  "CASE WHEN NULLIF(BTRIM(reference), '') ~ '^[0-9]+$' THEN reference::bigint END NULLS LAST, reference ASC";
+
 export function getDashboardMetrics(): DashboardMetrics {
   const db = getDb();
   const today = getSaoPauloDateIso();
@@ -184,7 +190,7 @@ export function listCustomers(opts: { q?: string; limit?: number } = {}): Custom
   const limit = opts.limit ?? 50;
   if (!q) {
     return db
-      .prepare(`${customerSelect} ORDER BY CAST(code AS INTEGER) ASC, code ASC LIMIT ?`)
+      .prepare(`${customerSelect} ORDER BY ${CUSTOMER_CODE_ORDER_SQL} LIMIT ?`)
       .all(limit) as CustomerRow[];
   }
   return db
@@ -195,7 +201,7 @@ export function listCustomers(opts: { q?: string; limit?: number } = {}): Custom
         name LIKE ? OR trade_name LIKE ? OR code LIKE ? OR cnpj LIKE ? OR
         cep LIKE ? OR city LIKE ? OR phone LIKE ? OR email LIKE ? OR
         home_page LIKE ? OR block_reason LIKE ? OR customer_type_code LIKE ?
-      ORDER BY CAST(code AS INTEGER) ASC, code ASC
+      ORDER BY ${CUSTOMER_CODE_ORDER_SQL}
       LIMIT ?
     `
     )
@@ -248,7 +254,7 @@ export function listProducts(opts: { q?: string; limit?: number } = {}): Product
             stock_qty as stockQty,
             min_stock as minStock
           FROM products
-          ORDER BY CAST(reference AS INTEGER) ASC, reference ASC
+          ORDER BY ${PRODUCT_REFERENCE_ORDER_SQL}
           LIMIT ?
         `
         )
@@ -276,7 +282,7 @@ export function listProducts(opts: { q?: string; limit?: number } = {}): Product
           stock_qty as stockQty,
           min_stock as minStock
         FROM products
-        ORDER BY CAST(reference AS INTEGER) ASC, reference ASC
+        ORDER BY ${PRODUCT_REFERENCE_ORDER_SQL}
       `
       )
       .all() as ProductRow[];
@@ -305,7 +311,7 @@ export function listProducts(opts: { q?: string; limit?: number } = {}): Product
           min_stock as minStock
         FROM products
         WHERE description LIKE ? OR reference LIKE ? OR barcode LIKE ? OR gtin LIKE ? OR tele_ref LIKE ?
-        ORDER BY CAST(reference AS INTEGER) ASC, reference ASC
+        ORDER BY ${PRODUCT_REFERENCE_ORDER_SQL}
         LIMIT ?
       `
       )
@@ -334,7 +340,7 @@ export function listProducts(opts: { q?: string; limit?: number } = {}): Product
         min_stock as minStock
       FROM products
       WHERE description LIKE ? OR reference LIKE ? OR barcode LIKE ? OR gtin LIKE ? OR tele_ref LIKE ?
-      ORDER BY CAST(reference AS INTEGER) ASC, reference ASC
+      ORDER BY ${PRODUCT_REFERENCE_ORDER_SQL}
     `
     )
     .all(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`) as ProductRow[];
@@ -349,7 +355,7 @@ export function listStockProducts(opts: { q?: string } = {}): ProductRecord[] {
         `
         SELECT *
         FROM products
-        ORDER BY CAST(reference AS INTEGER) ASC, reference ASC
+        ORDER BY ${PRODUCT_REFERENCE_ORDER_SQL}
       `
       )
       .all() as ProductRecord[];
@@ -362,7 +368,7 @@ export function listStockProducts(opts: { q?: string } = {}): ProductRecord[] {
       FROM products
       WHERE
         reference LIKE ? OR description LIKE ? OR tele_ref LIKE ? OR barcode LIKE ? OR gtin LIKE ? OR "Descr.Prod." LIKE ?
-      ORDER BY CAST(reference AS INTEGER) ASC, reference ASC
+      ORDER BY ${PRODUCT_REFERENCE_ORDER_SQL}
     `
     )
     .all(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`) as ProductRecord[];
