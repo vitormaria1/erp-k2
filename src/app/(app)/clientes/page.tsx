@@ -2,10 +2,33 @@ import Link from "next/link";
 
 import { listCustomers } from "@/lib/queries";
 
-export default async function ClientesPage(props: { searchParams?: Promise<{ q?: string }> }) {
+export default async function ClientesPage(props: {
+  searchParams?: Promise<{ q?: string; uf?: string; blocked?: string; taxpayer?: string; tracks?: string }>;
+}) {
   const sp = (await props.searchParams) ?? {};
   const q = sp.q ?? "";
-  const rows = listCustomers({ q, limit: 250 });
+  const uf = sp.uf ?? "";
+  const blocked = sp.blocked ?? "";
+  const taxpayer = sp.taxpayer ?? "";
+  const tracks = sp.tracks ?? "";
+  const baseRows = listCustomers({ q, limit: 500 });
+  const rows = baseRows.filter((row) => {
+    if (uf && row.uf !== uf) return false;
+    if (blocked === "yes" && !row.blocked) return false;
+    if (blocked === "no" && row.blocked) return false;
+    if (taxpayer === "yes" && !row.taxpayer) return false;
+    if (taxpayer === "no" && row.taxpayer) return false;
+    if (tracks === "yes" && !row.tracksOrders) return false;
+    if (tracks === "no" && row.tracksOrders) return false;
+    return true;
+  });
+  const ufOptions = Array.from(new Set(baseRows.map((row) => row.uf).filter(Boolean))).sort();
+  const summary = {
+    total: rows.length,
+    blocked: rows.filter((row) => Boolean(row.blocked)).length,
+    taxpayers: rows.filter((row) => Boolean(row.taxpayer)).length,
+    tracksOrders: rows.filter((row) => Boolean(row.tracksOrders)).length,
+  };
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-6">
@@ -17,13 +40,36 @@ export default async function ClientesPage(props: { searchParams?: Promise<{ q?:
           </div>
         </div>
         <div className="flex flex-col gap-2 md:flex-row md:items-center">
-          <form className="flex gap-2" action="/clientes" method="GET">
+          <form className="flex flex-wrap gap-2" action="/clientes" method="GET">
             <input
               name="q"
               defaultValue={q}
               placeholder="Buscar por nome, CNPJ, código, cidade..."
               className="w-full rounded-xl border bg-[var(--card)] px-4 py-3 text-sm outline-none md:w-[420px]"
             />
+            <select name="uf" defaultValue={uf} className="rounded-xl border bg-[var(--card)] px-4 py-3 text-sm">
+              <option value="">Todas as UFs</option>
+              {ufOptions.map((ufValue) => (
+                <option key={ufValue} value={ufValue}>
+                  {ufValue}
+                </option>
+              ))}
+            </select>
+            <select name="blocked" defaultValue={blocked} className="rounded-xl border bg-[var(--card)] px-4 py-3 text-sm">
+              <option value="">Bloqueio: todos</option>
+              <option value="yes">Somente bloqueados</option>
+              <option value="no">Somente ativos</option>
+            </select>
+            <select name="taxpayer" defaultValue={taxpayer} className="rounded-xl border bg-[var(--card)] px-4 py-3 text-sm">
+              <option value="">Contribuinte: todos</option>
+              <option value="yes">Somente contribuintes</option>
+              <option value="no">Somente não contribuintes</option>
+            </select>
+            <select name="tracks" defaultValue={tracks} className="rounded-xl border bg-[var(--card)] px-4 py-3 text-sm">
+              <option value="">Acompanha pedidos: todos</option>
+              <option value="yes">Somente sim</option>
+              <option value="no">Somente não</option>
+            </select>
             <button className="rounded-xl bg-black px-4 py-3 text-sm font-semibold text-white">
               Buscar
             </button>
@@ -36,6 +82,29 @@ export default async function ClientesPage(props: { searchParams?: Promise<{ q?:
           </Link>
         </div>
       </div>
+
+      <section className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-2xl border bg-[var(--card)] p-5 shadow-sm">
+          <div className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Clientes</div>
+          <div className="mt-2 text-3xl font-semibold">{summary.total}</div>
+          <div className="mt-1 text-sm text-[var(--muted)]">Resultado atual da busca</div>
+        </div>
+        <div className="rounded-2xl border bg-[var(--card)] p-5 shadow-sm">
+          <div className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Contribuintes</div>
+          <div className="mt-2 text-3xl font-semibold">{summary.taxpayers}</div>
+          <div className="mt-1 text-sm text-[var(--muted)]">Com IE / perfil fiscal ativo</div>
+        </div>
+        <div className="rounded-2xl border bg-[var(--card)] p-5 shadow-sm">
+          <div className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Acompanham pedidos</div>
+          <div className="mt-2 text-3xl font-semibold">{summary.tracksOrders}</div>
+          <div className="mt-1 text-sm text-[var(--muted)]">Marcados para rotina comercial</div>
+        </div>
+        <div className="rounded-2xl border bg-[var(--card)] p-5 shadow-sm">
+          <div className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Bloqueados</div>
+          <div className="mt-2 text-3xl font-semibold">{summary.blocked}</div>
+          <div className="mt-1 text-sm text-[var(--muted)]">Exigem revisão cadastral/comercial</div>
+        </div>
+      </section>
 
       <div className="mt-5 overflow-x-auto rounded-2xl border bg-[var(--card)] shadow-sm">
         <table className="min-w-[2200px] w-full text-sm">
