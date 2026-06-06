@@ -43,7 +43,7 @@ export default async function EstoquePage(props: { searchParams?: Promise<{ q?: 
   const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
   return (
-    <div className="mx-auto max-w-7xl px-6 py-6">
+    <div className="mx-auto w-full max-w-[1560px] px-4 py-6 sm:px-6 lg:px-8">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Produtos</h1>
@@ -51,11 +51,11 @@ export default async function EstoquePage(props: { searchParams?: Promise<{ q?: 
             Ajuste entradas/saídas, edite produtos e personalize as colunas da listagem.
           </div>
         </div>
-        <div className="flex flex-col gap-2 md:flex-row md:items-center">
+        <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:justify-end">
           <Link className="rounded-xl border px-4 py-3 text-sm font-semibold" href="/estoque/novo">
             Novo produto
           </Link>
-          <form className="flex gap-2" action="/estoque" method="GET">
+          <form className="flex flex-col gap-2 sm:flex-row" action="/estoque" method="GET">
             <input
               name="q"
               defaultValue={q}

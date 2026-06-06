@@ -190,7 +190,7 @@ export function StockTableClient({
       </details>
 
       <div className="overflow-x-auto rounded-2xl border bg-[var(--card)] shadow-sm">
-        <table className="w-full min-w-[1600px] table-fixed text-sm">
+        <table className="w-full min-w-[1280px] table-fixed text-sm">
           <thead className="bg-black/[0.02] text-left text-[var(--muted)]">
             <tr>
               {visibleColumns.map((column) => (

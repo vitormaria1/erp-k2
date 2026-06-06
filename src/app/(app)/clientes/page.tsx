@@ -33,7 +33,7 @@ export default async function ClientesPage(props: {
   };
 
   return (
-    <div className="mx-auto max-w-7xl px-6 py-6">
+    <div className="mx-auto w-full max-w-[1560px] px-4 py-6 sm:px-6 lg:px-8">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Clientes</h1>
@@ -41,13 +41,13 @@ export default async function ClientesPage(props: {
             Cadastro completo importado do PDF ou mantido manualmente.
           </div>
         </div>
-        <div className="flex flex-col gap-2 md:flex-row md:items-center">
+        <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center md:justify-end">
           <form className="flex flex-wrap gap-2" action="/clientes" method="GET">
             <input
               name="q"
               defaultValue={q}
               placeholder="Buscar por nome, CNPJ, código, cidade..."
-              className="w-full rounded-xl border bg-[var(--card)] px-4 py-3 text-sm outline-none md:w-[420px]"
+              className="w-full rounded-xl border bg-[var(--card)] px-4 py-3 text-sm outline-none md:w-[360px] xl:w-[420px]"
             />
             <select name="uf" defaultValue={uf} className="rounded-xl border bg-[var(--card)] px-4 py-3 text-sm">
               <option value="">Todas as UFs</option>
@@ -109,7 +109,7 @@ export default async function ClientesPage(props: {
       </section>
 
       <div className="mt-5 overflow-x-auto rounded-2xl border bg-[var(--card)] shadow-sm">
-        <table className="min-w-[2200px] w-full text-sm">
+        <table className="min-w-[1800px] w-full text-sm">
           <thead className="bg-black/[0.02] text-left text-[var(--muted)]">
             <tr>
               <th className="px-4 py-3">Código</th>

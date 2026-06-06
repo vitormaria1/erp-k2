@@ -106,7 +106,9 @@ function listTopInputUsage(limit = 8): InputUsageRow[] {
       FROM production_order_inputs poi
       JOIN products p ON p.id = poi.input_product_id
       GROUP BY p.id, p.description, p.reference
-      ORDER BY totalQty DESC, estimatedCost DESC
+      ORDER BY
+        COALESCE(SUM(poi.total_quantity), 0) DESC,
+        COALESCE(SUM(poi.total_quantity * COALESCE(p.cost, 0)), 0) DESC
       LIMIT ?
     `
     )
@@ -172,7 +174,7 @@ export default async function ProducaoPage(props: {
   const summary = summarizeOrders(orders);
   const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
   return (
-    <div className="mx-auto max-w-6xl px-6 py-6">
+    <div className="mx-auto w-full max-w-[1560px] px-4 py-6 sm:px-6 lg:px-8">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Produção</h1>
@@ -255,8 +257,8 @@ export default async function ProducaoPage(props: {
         </form>
       </div>
 
-      <div className="mt-6 overflow-hidden rounded-2xl border bg-[var(--card)] shadow-sm">
-        <table className="w-full text-sm">
+      <div className="mt-6 overflow-x-auto rounded-2xl border bg-[var(--card)] shadow-sm">
+        <table className="min-w-[1080px] w-full text-sm">
           <thead className="bg-black/[0.02] text-left text-[var(--muted)]">
             <tr>
               <th className="px-4 py-3">Criado em</th>
