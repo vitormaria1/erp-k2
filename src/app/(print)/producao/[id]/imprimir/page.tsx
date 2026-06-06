@@ -37,7 +37,9 @@ function getPrintable(productionOrderId: string) {
       FROM production_order_products pop
       JOIN products p ON p.id = pop.product_id
       WHERE pop.production_order_id = ?
-      ORDER BY CAST(p.reference AS INTEGER) ASC, p.reference ASC
+      ORDER BY CASE
+        WHEN NULLIF(BTRIM(p.reference), '') ~ '^[0-9]+$' THEN p.reference::bigint
+      END NULLS LAST, p.reference ASC
     `
     )
     .all(productionOrderId) as ProductRow[];
@@ -53,7 +55,9 @@ function getPrintable(productionOrderId: string) {
       FROM production_order_inputs poi
       JOIN products p ON p.id = poi.input_product_id
       WHERE poi.production_order_id = ?
-      ORDER BY CAST(p.reference AS INTEGER) ASC, p.reference ASC
+      ORDER BY CASE
+        WHEN NULLIF(BTRIM(p.reference), '') ~ '^[0-9]+$' THEN p.reference::bigint
+      END NULLS LAST, p.reference ASC
     `
     )
     .all(productionOrderId) as InputRow[];

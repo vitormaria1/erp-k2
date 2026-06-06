@@ -252,7 +252,7 @@ export default async function ProducaoPage(props: {
           <ProductionOrderClient products={products} />
 
           <button className="mt-4 rounded-xl bg-[var(--k2-red-2)] px-5 py-3 text-sm font-semibold text-white">
-            Gerar lista de insumos
+            Gerar lista de producao
           </button>
         </form>
       </div>

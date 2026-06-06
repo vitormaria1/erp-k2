@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getDb } from "@/lib/db";
+import { updateOrderStatusWithFinancialSync } from "@/lib/order-finance-sync";
 import { isAuthenticated } from "@/lib/simple-auth";
 
 import { ORDER_STATUS_VALUES, type OrderStatus } from "./status";
@@ -27,5 +28,5 @@ export async function updateOrderStatusAction(orderId: number, formData: FormDat
 
 function updateOrderStatus(orderId: number, status: OrderStatus) {
   const db = getDb();
-  db.prepare("UPDATE orders SET status = ?, updated_at = datetime('now') WHERE id = ?").run(status, orderId);
+  updateOrderStatusWithFinancialSync(db, orderId, status);
 }

@@ -43,7 +43,7 @@ export default async function EstoquePage(props: { searchParams?: Promise<{ q?: 
   const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
   return (
-    <div className="mx-auto w-full max-w-[1560px] px-4 py-6 sm:px-6 lg:px-8">
+    <div className="mx-auto w-full min-w-0 max-w-[1560px] px-4 py-6 sm:px-6 lg:px-8">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Produtos</h1>

@@ -1,5 +1,5 @@
 import { getFiscalDbPool } from "@/fiscal/infra/pg";
-import { listFiscalInvoices } from "@/fiscal/persistence/pg/dashboard_queries";
+import type { FiscalInvoiceListRow } from "@/fiscal/persistence/pg/dashboard_queries";
 import { formatDateTime } from "@/lib/datetime";
 
 import { FiscalInlineWorkerClient } from "./inline_worker_client";
@@ -23,9 +23,53 @@ async function getInvoiceById(id: string) {
   return (res.rows[0] as Record<string, unknown> | undefined) ?? null;
 }
 
+async function listFiscalInvoicesFiltered(args: { q: string; limit: number }) {
+  const pool = getFiscalDbPool();
+  const q = args.q.trim();
+
+  if (!q) {
+    const res = await pool.query(
+      `
+      SELECT
+        id, created_at, issuer_cnpj, customer_id, model, serie, numero,
+        internal_status, focus_ref, focus_status, sefaz_status, chave_acesso
+      FROM fiscal_invoices
+      ORDER BY created_at DESC
+      LIMIT $1
+    `,
+      [args.limit]
+    );
+    return res.rows as FiscalInvoiceListRow[];
+  }
+
+  const like = `%${q}%`;
+  const res = await pool.query(
+    `
+    SELECT
+      id, created_at, issuer_cnpj, customer_id, model, serie, numero,
+      internal_status, focus_ref, focus_status, sefaz_status, chave_acesso
+    FROM fiscal_invoices
+    WHERE
+      serie ILIKE $1 OR
+      COALESCE(numero::text, '') ILIKE $1 OR
+      internal_status ILIKE $1 OR
+      COALESCE(focus_status, '') ILIKE $1 OR
+      COALESCE(sefaz_status, '') ILIKE $1 OR
+      COALESCE(chave_acesso, '') ILIKE $1 OR
+      COALESCE(focus_ref, '') ILIKE $1
+    ORDER BY created_at DESC
+    LIMIT $2
+  `,
+    [like, args.limit]
+  );
+  return res.rows as FiscalInvoiceListRow[];
+}
+
 export default async function NotaFiscalPage(props: { searchParams?: Promise<Record<string, string | string[]>> }) {
   const searchParams: Record<string, string | string[]> =
     (await props.searchParams?.catch(() => ({} as Record<string, string | string[]>))) ?? {};
+  const qParam = searchParams.q;
+  const q = typeof qParam === "string" ? qParam : "";
   const invoiceIdParam = searchParams.invoiceId;
   const invoiceId = typeof invoiceIdParam === "string" ? invoiceIdParam : null;
   const lastInvoice = invoiceId ? await getInvoiceById(invoiceId).catch(() => null) : null;
@@ -36,7 +80,7 @@ export default async function NotaFiscalPage(props: { searchParams?: Promise<Rec
 
   const invoicesRes = await (async () => {
     try {
-      const invoices = await listFiscalInvoices(getFiscalDbPool(), 25);
+      const invoices = await listFiscalInvoicesFiltered({ q, limit: 100 });
       return { invoices, error: null as string | null };
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -128,11 +172,6 @@ export default async function NotaFiscalPage(props: { searchParams?: Promise<Rec
         </div>
       ) : null}
 
-      <div className="mt-4 rounded-2xl border bg-[var(--card)] p-4 text-xs text-[var(--muted)]">
-        Emissão assíncrona: após clicar em Emitir, o documento entra em fila e aparece abaixo. Para processar em background e fazer polling automático, rode o worker em outro terminal:{" "}
-        <code>npm run fiscal:worker</code>.
-      </div>
-
       {invoicesError ? (
         <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
           <div className="font-semibold">Erro ao ler banco fiscal</div>
@@ -143,33 +182,24 @@ export default async function NotaFiscalPage(props: { searchParams?: Promise<Rec
         </div>
       ) : null}
 
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="rounded-2xl border bg-[var(--card)] p-5">
-          <div className="text-sm font-semibold">1) Seed fiscal (a partir de XMLs reais)</div>
-          <div className="mt-1 text-xs text-[var(--muted)]">
-            Preenche perfil/operação e dados fiscais de produtos no Postgres fiscal.
-          </div>
-          <form action="/api/fiscal/seed-xml" method="post" className="mt-3 flex items-end gap-2">
-            <div className="flex-1">
-              <label className="text-xs text-[var(--muted)]">Pasta de XMLs</label>
-              <input
-                name="xmlDir"
-                defaultValue="NFes_09572986000149_01052026a26052026"
-                className="mt-1 w-full rounded-xl border bg-transparent px-3 py-2 text-sm"
-              />
-            </div>
-            <button className="rounded-xl bg-black px-4 py-2 text-sm font-medium text-white">
-              Seed
-            </button>
-          </form>
-          <div className="mt-3 text-xs text-[var(--muted)]">
-            Pré-requisitos: `DATABASE_URL` configurada no ambiente
-          </div>
-        </div>
-      </div>
-
       <div className="mt-4 rounded-2xl border bg-[var(--card)] p-5">
-        <div className="text-sm font-semibold">Documentos fiscais (Postgres)</div>
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div className="text-sm font-semibold">Notas fiscais</div>
+          <form action="/nota-fiscal" method="GET" className="flex w-full flex-col gap-2 sm:flex-row md:max-w-xl">
+            <input
+              name="q"
+              defaultValue={q}
+              placeholder="Buscar por serie, numero, status, chave ou ref..."
+              className="w-full rounded-xl border bg-transparent px-3 py-2 text-sm"
+            />
+            <button className="rounded-xl bg-black px-4 py-2 text-sm font-medium text-white">Buscar</button>
+            {(q || invoiceId) ? (
+              <Link className="rounded-xl border px-4 py-2 text-center text-sm font-medium" href="/nota-fiscal">
+                Limpar
+              </Link>
+            ) : null}
+          </form>
+        </div>
         <div className="mt-3 overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="text-[var(--muted)]">
@@ -187,7 +217,7 @@ export default async function NotaFiscalPage(props: { searchParams?: Promise<Rec
               {invoices.length === 0 ? (
                 <tr>
                   <td className="py-3 text-[var(--muted)]" colSpan={7}>
-                    Nenhuma NF ainda (ou Postgres fiscal não configurado).
+                    {q ? "Nenhuma nota encontrada para essa busca." : "Nenhuma NF ainda (ou Postgres fiscal nao configurado)."}
                   </td>
                 </tr>
               ) : (
