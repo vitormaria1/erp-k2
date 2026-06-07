@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getDb } from "@/lib/db";
+import { ensureCustomerSchema } from "@/lib/customer-schema";
 
 const optionalText = z
   .string()
@@ -24,6 +25,7 @@ const customerSchema = z.object({
   taxpayer: z.coerce.boolean().default(false),
   name: z.string().trim().min(1, "Informe o nome do cliente."),
   tradeName: optionalText,
+  seller: optionalText,
   cep: optionalText,
   street: optionalText,
   number: optionalText,
@@ -54,6 +56,7 @@ function parseCustomerForm(formData: FormData) {
     taxpayer: formData.get("taxpayer") === "on",
     name: formData.get("name")?.toString(),
     tradeName: formData.get("tradeName")?.toString(),
+    seller: formData.get("seller")?.toString(),
     cep: formData.get("cep")?.toString(),
     street: formData.get("street")?.toString(),
     number: formData.get("number")?.toString(),
@@ -78,6 +81,7 @@ function parseCustomerForm(formData: FormData) {
 
 function ensureUniqueCode(code: string, currentId?: string) {
   const db = getDb();
+  ensureCustomerSchema(db);
   const existing = db.prepare("SELECT id FROM customers WHERE code = ? LIMIT 1").get(code) as
     | { id: string }
     | undefined;
@@ -92,16 +96,17 @@ export async function createCustomerAction(formData: FormData) {
   ensureUniqueCode(parsed.code);
 
   const db = getDb();
+  ensureCustomerSchema(db);
   db.prepare(
     `
       INSERT INTO customers (
-        id, code, cnpj, state_tax_id, taxpayer, name, trade_name, cep,
+        id, code, cnpj, state_tax_id, taxpayer, name, trade_name, seller, cep,
         street, number, complement, neighborhood, city, uf, city_code,
         country, country_code, phone, email, home_page, tracks_orders,
         registered_at, last_updated_at, blocked, block_reason, customer_type_code, updated_at
       )
       VALUES (
-        @id, @code, @cnpj, @state_tax_id, @taxpayer, @name, @trade_name, @cep,
+        @id, @code, @cnpj, @state_tax_id, @taxpayer, @name, @trade_name, @seller, @cep,
         @street, @number, @complement, @neighborhood, @city, @uf, @city_code,
         @country, @country_code, @phone, @email, @home_page, @tracks_orders,
         @registered_at, @last_updated_at, @blocked, @block_reason, @customer_type_code, datetime('now')
@@ -115,6 +120,7 @@ export async function createCustomerAction(formData: FormData) {
     taxpayer: parsed.taxpayer ? 1 : 0,
     name: parsed.name,
     trade_name: parsed.tradeName,
+    seller: parsed.seller ?? "VANDO",
     cep: parsed.cep,
     street: parsed.street,
     number: parsed.number,
@@ -146,6 +152,7 @@ export async function updateCustomerAction(formData: FormData) {
   ensureUniqueCode(parsed.code, parsed.id);
 
   const db = getDb();
+  ensureCustomerSchema(db);
   const result = db
     .prepare(
       `
@@ -156,6 +163,7 @@ export async function updateCustomerAction(formData: FormData) {
           taxpayer=@taxpayer,
           name=@name,
           trade_name=@trade_name,
+          seller=@seller,
           cep=@cep,
           street=@street,
           number=@number,
@@ -187,6 +195,7 @@ export async function updateCustomerAction(formData: FormData) {
       taxpayer: parsed.taxpayer ? 1 : 0,
       name: parsed.name,
       trade_name: parsed.tradeName,
+      seller: parsed.seller ?? "VANDO",
       cep: parsed.cep,
       street: parsed.street,
       number: parsed.number,

@@ -13,12 +13,14 @@ type Field = {
   label: string;
   required?: boolean;
   placeholder?: string;
+  defaultValue?: string;
 };
 
 const registrationFields: Field[] = [
   { name: "code", label: "Código", required: true },
   { name: "name", label: "Nome / Razão social", required: true },
   { name: "tradeName", label: "Nome fantasia" },
+  { name: "seller", label: "Vendedor", defaultValue: "VANDO" },
   { name: "cnpj", label: "CPF/CNPJ" },
   { name: "stateTaxId", label: "Inscrição estadual" },
   { name: "cep", label: "CEP" },
@@ -59,7 +61,7 @@ function TextField({ field, customer }: { field: Field; customer?: CustomerRow }
       </div>
       <input
         name={field.name}
-        defaultValue={typeof value === "string" ? value : ""}
+        defaultValue={typeof value === "string" ? value : field.defaultValue ?? ""}
         required={field.required}
         placeholder={field.placeholder}
         className="w-full rounded-xl border bg-[var(--card)] px-4 py-3 text-sm outline-none focus:border-black/40"

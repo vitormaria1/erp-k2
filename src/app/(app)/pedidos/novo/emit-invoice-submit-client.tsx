@@ -16,6 +16,13 @@ type IssueResponse = {
   error?: string;
 };
 
+type CreateOrderResponse = {
+  ok: boolean;
+  orderId?: number;
+  orderPrintUrl?: string;
+  error?: string;
+};
+
 type InvoiceStatusResponse = {
   id: string;
   internal_status?: string | null;
@@ -242,6 +249,59 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
     });
   }
 
+  function handleCreateOrderClick() {
+    const form = document.getElementById(formId);
+    if (!(form instanceof HTMLFormElement)) return;
+    if (!form.reportValidity()) return;
+
+    const popup = window.open("", "_blank");
+    setNotice({
+      tone: "loading",
+      text: "Criando pedido e abrindo a impressão em outra guia.",
+    });
+
+    startTransition(async () => {
+      try {
+        const formData = new FormData(form);
+        const res = await fetch("/api/orders/create", {
+          method: "POST",
+          headers: { accept: "application/json" },
+          body: formData,
+        });
+
+        const payload = (await res.json().catch(() => null)) as CreateOrderResponse | null;
+        if (!payload) {
+          throw new Error("Resposta inválida ao criar pedido.");
+        }
+
+        if (!res.ok || !payload.ok || !payload.orderPrintUrl) {
+          if (popup && !popup.closed) popup.close();
+          setNotice({
+            tone: "error",
+            text: payload.error ?? "Falha ao criar pedido.",
+          });
+          return;
+        }
+
+        if (popup && !popup.closed) {
+          popup.location.href = payload.orderPrintUrl;
+        } else {
+          window.open(payload.orderPrintUrl, "_blank", "noopener,noreferrer");
+        }
+
+        setNotice({
+          tone: "success",
+          text: `Pedido #${payload.orderId ?? "-"} criado. A impressão foi aberta em outra guia.`,
+          orderPrintUrl: payload.orderPrintUrl,
+        });
+      } catch (error) {
+        if (popup && !popup.closed) popup.close();
+        const msg = error instanceof Error ? error.message : String(error);
+        setNotice({ tone: "error", text: msg });
+      }
+    });
+  }
+
   const toneClass =
     notice.tone === "error"
       ? "border-red-200 bg-red-50 text-red-900"
@@ -252,8 +312,9 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
       <button
-        name="submitIntent"
-        value="create_order"
+        type="button"
+        onClick={handleCreateOrderClick}
+        disabled={isPending}
         className="cursor-pointer rounded-xl border px-5 py-3 text-sm font-semibold"
       >
         Criar pedido

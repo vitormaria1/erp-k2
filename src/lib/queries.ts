@@ -1,5 +1,6 @@
 import { getDb } from "./db";
 import { getSaoPauloDateIso, getSaoPauloYearMonth } from "./datetime";
+import { ensureCustomerSchema } from "./customer-schema";
 
 export type DashboardMetrics = {
   ordersToday: number;
@@ -33,6 +34,7 @@ export type CustomerRow = {
   taxpayer: number;
   name: string;
   tradeName: string | null;
+  seller: string | null;
   cep: string | null;
   street: string | null;
   number: string | null;
@@ -162,6 +164,7 @@ const customerSelect = `
     taxpayer,
     name,
     trade_name as tradeName,
+    seller,
     cep,
     street,
     number,
@@ -186,6 +189,7 @@ const customerSelect = `
 
 export function listCustomers(opts: { q?: string; limit?: number } = {}): CustomerRow[] {
   const db = getDb();
+  ensureCustomerSchema(db);
   const q = (opts.q ?? "").trim();
   const limit = opts.limit ?? 50;
   if (!q) {
@@ -223,6 +227,7 @@ export function listCustomers(opts: { q?: string; limit?: number } = {}): Custom
 
 export function getCustomerById(id: string): CustomerRow | null {
   const db = getDb();
+  ensureCustomerSchema(db);
   return (db.prepare(`${customerSelect} WHERE id = ?`).get(id) as CustomerRow | undefined) ?? null;
 }
 

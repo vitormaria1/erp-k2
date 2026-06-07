@@ -2,6 +2,7 @@ import Image from "next/image";
 import { notFound } from "next/navigation";
 
 import { PrintButtons, PrintOnLoad } from "./print-client";
+import { ensureCustomerSchema } from "@/lib/customer-schema";
 import { getDb } from "@/lib/db";
 import { formatDateTime } from "@/lib/datetime";
 
@@ -43,61 +44,32 @@ function formatCustomerAddress(order: PrintableOrder) {
 
 function getOrderPrintable(orderId: number) {
   const db = getDb();
-  let order: PrintableOrder | undefined;
-
-  try {
-    order = db
-      .prepare(
-        `
-        SELECT
-          o.id as id,
-          o.created_at as createdAt,
-          o.notes as notes,
-          c.name as customerName,
-          c.trade_name as customerTradeName,
-          c.code as customerCode,
-          c.cnpj as customerCnpj,
-          c."Nome Rep." as customerSeller,
-          c.street as customerStreet,
-          c.number as customerNumber,
-          c.complement as customerComplement,
-          c.neighborhood as customerNeighborhood,
-          c.city as customerCity,
-          c.uf as customerUf,
-          c.cep as customerCep
-        FROM orders o
-        JOIN customers c ON c.id = o.customer_id
-        WHERE o.id = ?
+  ensureCustomerSchema(db);
+  const order = db
+    .prepare(
       `
-      )
-      .get(orderId) as PrintableOrder | undefined;
-  } catch {
-    order = db
-      .prepare(
-        `
-        SELECT
-          o.id as id,
-          o.created_at as createdAt,
-          o.notes as notes,
-          c.name as customerName,
-          c.trade_name as customerTradeName,
-          c.code as customerCode,
-          c.cnpj as customerCnpj,
-          NULL as customerSeller,
-          c.street as customerStreet,
-          c.number as customerNumber,
-          c.complement as customerComplement,
-          c.neighborhood as customerNeighborhood,
-          c.city as customerCity,
-          c.uf as customerUf,
-          c.cep as customerCep
-        FROM orders o
-        JOIN customers c ON c.id = o.customer_id
-        WHERE o.id = ?
-      `
-      )
-      .get(orderId) as PrintableOrder | undefined;
-  }
+      SELECT
+        o.id as id,
+        o.created_at as createdAt,
+        o.notes as notes,
+        c.name as customerName,
+        c.trade_name as customerTradeName,
+        c.code as customerCode,
+        c.cnpj as customerCnpj,
+        c.seller as customerSeller,
+        c.street as customerStreet,
+        c.number as customerNumber,
+        c.complement as customerComplement,
+        c.neighborhood as customerNeighborhood,
+        c.city as customerCity,
+        c.uf as customerUf,
+        c.cep as customerCep
+      FROM orders o
+      JOIN customers c ON c.id = o.customer_id
+      WHERE o.id = ?
+    `
+    )
+    .get(orderId) as PrintableOrder | undefined;
 
   if (!order) return null;
 
@@ -141,106 +113,110 @@ export default async function PrintPedidoPage({
   const customerAddress = formatCustomerAddress(order);
 
   return (
-    <div className="mx-auto max-w-3xl p-8 print:p-0">
+    <div
+      id="print-fit-shell"
+      className="loading-print-shell mx-auto w-full max-w-[210mm] p-3 print:w-[190mm] print:p-0"
+    >
       <PrintOnLoad />
-      <div className="flex items-center justify-between border-b pb-4">
-        <div className="flex items-center gap-4">
-          <Image src="/k2-logo.jpeg" alt="K2 Salgados" width={72} height={72} priority />
-          <div>
-            <div className="text-xl font-extrabold tracking-tight">K2 Salgados</div>
-            <div className="text-sm text-black/70">Indústria e Distribuição de Congelados</div>
+      <div id="print-fit-content" className="loading-print-content rounded-2xl bg-white">
+        <div className="flex items-start justify-between border-b pb-2">
+          <div className="flex items-center gap-3">
+            <Image src="/k2-logo.jpeg" alt="K2 Salgados" width={52} height={52} priority />
+            <div>
+              <div className="text-lg font-extrabold tracking-tight">K2 Salgados</div>
+              <div className="text-[11px] text-black/70">Indústria e Distribuição de Congelados</div>
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-black/60">Pedido</div>
+            <div className="text-xl font-extrabold leading-none">#{order.id}</div>
+            <div className="mt-1 text-[11px] text-black/60">{created}</div>
           </div>
         </div>
-        <div className="text-right">
-          <div className="text-sm text-black/70">Pedido</div>
-          <div className="text-2xl font-extrabold">#{order.id}</div>
-          <div className="text-xs text-black/60">{created}</div>
-        </div>
-      </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 rounded-2xl border p-4 md:grid-cols-2">
-        <div>
-          <div className="text-xs font-semibold uppercase tracking-wide text-black/60">Cliente</div>
-          <div className="text-base font-bold">
-            {order.customerTradeName ? order.customerTradeName : order.customerName}
+        <div className="mt-2 grid grid-cols-[minmax(0,1.5fr)_minmax(180px,1fr)] gap-2 rounded-xl border p-2">
+          <div className="min-w-0">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-black/60">Cliente</div>
+            <div className="truncate text-sm font-bold">
+              {order.customerTradeName ? order.customerTradeName : order.customerName}
+            </div>
+            {order.customerTradeName ? (
+              <div className="truncate text-[11px] text-black/70">{order.customerName}</div>
+            ) : null}
+            {order.customerCnpj ? <div className="text-[11px] text-black/70">{order.customerCnpj}</div> : null}
           </div>
-          {order.customerTradeName ? (
-            <div className="text-sm text-black/70">{order.customerName}</div>
-          ) : null}
-          {order.customerCnpj ? <div className="text-sm text-black/70">{order.customerCnpj}</div> : null}
-        </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-black/60">Código do cliente</div>
-            <div className="text-sm">{order.customerCode || "-"}</div>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] leading-tight">
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-black/60">Código</div>
+              <div className="font-medium">{order.customerCode || "-"}</div>
+            </div>
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-black/60">Vendedor</div>
+              <div className="truncate font-medium">{order.customerSeller || "-"}</div>
+            </div>
+            <div className="col-span-2">
+              <div className="text-[10px] font-semibold uppercase tracking-wide text-black/60">Endereço</div>
+              {customerAddress.length ? (
+                <div className="text-black/70">{customerAddress.join(" | ")}</div>
+              ) : (
+                <div className="text-black/70">Endereço não informado.</div>
+              )}
+            </div>
           </div>
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-black/60">Vendedor</div>
-            <div className="text-sm">{order.customerSeller || "-"}</div>
-          </div>
         </div>
-        <div className="md:col-span-2">
-          <div className="text-xs font-semibold uppercase tracking-wide text-black/60">Endereço</div>
-          {customerAddress.length ? (
-            customerAddress.map((line) => (
-              <div key={line} className="text-sm text-black/70">
-                {line}
-              </div>
-            ))
-          ) : (
-            <div className="text-sm text-black/70">Endereço não informado.</div>
-          )}
-        </div>
+
         {order.notes ? (
-          <div className="md:col-span-2">
-            <div className="text-xs font-semibold uppercase tracking-wide text-black/60">
+          <div className="mt-2 rounded-xl border p-2">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-black/60">
               Observações
             </div>
-            <div className="text-sm">{order.notes}</div>
+            <div className="mt-0.5 text-[11px] leading-tight">{order.notes}</div>
           </div>
         ) : null}
-      </div>
 
-      <div className="mt-4 overflow-hidden rounded-2xl border">
-        <table className="w-full text-sm">
-          <thead className="bg-black/[0.03] text-left">
-            <tr>
-              <th className="px-4 py-3">Código</th>
-              <th className="px-4 py-3">Produto</th>
-              <th className="px-4 py-3">Un.</th>
-              <th className="px-4 py-3 text-right">Qtd</th>
-              <th className="px-4 py-3 text-right">Vlr. unit.</th>
-              <th className="px-4 py-3 text-right">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((it) => (
-              <tr key={`${it.code}-${it.name}`} className="border-t">
-                <td className="px-4 py-3 font-semibold">{it.code}</td>
-                <td className="px-4 py-3">{it.name}</td>
-                <td className="px-4 py-3">{it.unit || "-"}</td>
-                <td className="px-4 py-3 text-right">{Number(it.quantity).toFixed(3)}</td>
-                <td className="px-4 py-3 text-right">{money.format(Number(it.unitPrice))}</td>
-                <td className="px-4 py-3 text-right font-semibold">{money.format(Number(it.total))}</td>
-              </tr>
-            ))}
-            {items.length === 0 ? (
+        <div className="mt-2 overflow-hidden rounded-xl border">
+          <table className="w-full table-fixed text-[11px] leading-tight">
+            <thead className="bg-black/[0.03] text-left">
               <tr>
-                <td className="px-4 py-8 text-black/60" colSpan={6}>
-                  Pedido sem itens.
-                </td>
+                <th className="w-[68px] px-2 py-1.5">Código</th>
+                <th className="px-2 py-1.5">Produto</th>
+                <th className="w-[42px] px-2 py-1.5">Un.</th>
+                <th className="w-[68px] px-2 py-1.5 text-right">Qtd</th>
+                <th className="w-[92px] px-2 py-1.5 text-right">Vlr. unit.</th>
+                <th className="w-[92px] px-2 py-1.5 text-right">Total</th>
               </tr>
-            ) : null}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {items.map((it) => (
+                <tr key={`${it.code}-${it.name}`} className="border-t">
+                  <td className="px-2 py-1 font-semibold">{it.code}</td>
+                  <td className="px-2 py-1">
+                    <div className="truncate">{it.name}</div>
+                  </td>
+                  <td className="px-2 py-1">{it.unit || "-"}</td>
+                  <td className="px-2 py-1 text-right">{Number(it.quantity).toFixed(3)}</td>
+                  <td className="px-2 py-1 text-right">{money.format(Number(it.unitPrice))}</td>
+                  <td className="px-2 py-1 text-right font-semibold">{money.format(Number(it.total))}</td>
+                </tr>
+              ))}
+              {items.length === 0 ? (
+                <tr>
+                  <td className="px-2 py-4 text-black/60" colSpan={6}>
+                    Pedido sem itens.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
 
-      <div className="mt-4 flex items-center justify-between">
-        <div className="text-sm text-black/60">Conferir e imprimir</div>
-        <div className="text-xl font-extrabold">{money.format(grandTotal)}</div>
-      </div>
+        <div className="mt-2 flex items-center justify-between rounded-xl border px-3 py-2">
+          <div className="text-[11px] text-black/60">Conferir e imprimir</div>
+          <div className="text-lg font-extrabold">{money.format(grandTotal)}</div>
+        </div>
 
-      <PrintButtons />
+        <PrintButtons />
+      </div>
     </div>
   );
 }

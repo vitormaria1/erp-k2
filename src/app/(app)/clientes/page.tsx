@@ -109,12 +109,13 @@ export default async function ClientesPage(props: {
       </section>
 
       <div className="mt-5 overflow-x-auto rounded-2xl border bg-[var(--card)] shadow-sm">
-        <table className="min-w-[1800px] w-full text-sm">
+        <table className="min-w-[1880px] w-full text-sm">
           <thead className="bg-black/[0.02] text-left text-[var(--muted)]">
             <tr>
               <th className="px-4 py-3">Código</th>
               <th className="px-4 py-3">Nome</th>
               <th className="px-4 py-3">Fantasia</th>
+              <th className="px-4 py-3">Vendedor</th>
               <th className="px-4 py-3">CPF/CNPJ</th>
               <th className="px-4 py-3">IE</th>
               <th className="px-4 py-3">TP Cad.</th>
@@ -146,6 +147,7 @@ export default async function ClientesPage(props: {
                 <td className="px-4 py-3 font-medium">{c.code}</td>
                 <td className="px-4 py-3 font-semibold">{c.name}</td>
                 <td className="px-4 py-3 text-[var(--muted)]">{c.tradeName ?? "-"}</td>
+                <td className="px-4 py-3">{c.seller ?? "-"}</td>
                 <td className="px-4 py-3">{c.cnpj ?? "-"}</td>
                 <td className="px-4 py-3">{c.stateTaxId ?? "-"}</td>
                 <td className="px-4 py-3">{c.customerTypeCode ?? "-"}</td>
@@ -180,7 +182,7 @@ export default async function ClientesPage(props: {
             ))}
             {rows.length === 0 ? (
               <tr>
-                <td className="px-4 py-8 text-[var(--muted)]" colSpan={26}>
+                <td className="px-4 py-8 text-[var(--muted)]" colSpan={27}>
                   Nenhum cliente encontrado.
                 </td>
               </tr>

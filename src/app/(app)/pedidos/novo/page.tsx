@@ -1,5 +1,3 @@
-import { createOrderAction } from "./actions";
-
 import { getDb } from "@/lib/db";
 import { OrderItemsClient, type ProductOpt } from "./order-items-client";
 import { CustomerSelectClient, type CustomerOpt } from "./customer-select-client";
@@ -43,7 +41,7 @@ export default function NovoPedidoPage() {
         Selecione o cliente, monte os itens e crie o pedido.
       </div>
 
-      <form id={formId} action={createOrderAction} className="mt-6 space-y-4 rounded-2xl border bg-[var(--card)] p-5">
+      <form id={formId} className="mt-6 space-y-4 rounded-2xl border bg-[var(--card)] p-5">
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <label className="space-y-1">
             <div className="text-sm font-semibold">Cliente</div>
