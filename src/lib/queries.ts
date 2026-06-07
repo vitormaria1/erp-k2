@@ -35,6 +35,8 @@ export type CustomerRow = {
   name: string;
   tradeName: string | null;
   seller: string | null;
+  routeLabels: string | null;
+  routeWeekdaysCsv: string | null;
   cep: string | null;
   street: string | null;
   number: string | null;
@@ -165,6 +167,26 @@ const customerSelect = `
     name,
     trade_name as tradeName,
     seller,
+    (
+      SELECT string_agg(
+        CASE crd.weekday
+          WHEN 1 THEN 'Segunda'
+          WHEN 2 THEN 'Terça'
+          WHEN 3 THEN 'Quarta'
+          WHEN 4 THEN 'Quinta'
+          WHEN 5 THEN 'Sexta'
+        END,
+        ', '
+        ORDER BY crd.weekday
+      )
+      FROM customer_route_days crd
+      WHERE crd.customer_id = customers.id
+    ) as routeLabels,
+    (
+      SELECT string_agg(crd.weekday::text, ',' ORDER BY crd.weekday)
+      FROM customer_route_days crd
+      WHERE crd.customer_id = customers.id
+    ) as routeWeekdaysCsv,
     cep,
     street,
     number,
@@ -204,12 +226,27 @@ export function listCustomers(opts: { q?: string; limit?: number } = {}): Custom
       WHERE
         name LIKE ? OR trade_name LIKE ? OR code LIKE ? OR cnpj LIKE ? OR
         cep LIKE ? OR city LIKE ? OR phone LIKE ? OR email LIKE ? OR
-        home_page LIKE ? OR block_reason LIKE ? OR customer_type_code LIKE ?
+        home_page LIKE ? OR block_reason LIKE ? OR customer_type_code LIKE ? OR
+        EXISTS (
+          SELECT 1
+          FROM customer_route_days crd
+          WHERE crd.customer_id = customers.id
+            AND (
+              CASE crd.weekday
+                WHEN 1 THEN 'Segunda'
+                WHEN 2 THEN 'Terça'
+                WHEN 3 THEN 'Quarta'
+                WHEN 4 THEN 'Quinta'
+                WHEN 5 THEN 'Sexta'
+              END
+            ) LIKE ?
+        )
       ORDER BY ${CUSTOMER_CODE_ORDER_SQL}
       LIMIT ?
     `
     )
     .all(
+      `%${q}%`,
       `%${q}%`,
       `%${q}%`,
       `%${q}%`,

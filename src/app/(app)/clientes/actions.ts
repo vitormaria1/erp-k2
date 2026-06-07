@@ -7,7 +7,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { getDb } from "@/lib/db";
-import { ensureCustomerSchema } from "@/lib/customer-schema";
+import { ensureCustomerSchema, syncCustomerRouteDays } from "@/lib/customer-schema";
 
 const optionalText = z
   .string()
@@ -26,6 +26,7 @@ const customerSchema = z.object({
   name: z.string().trim().min(1, "Informe o nome do cliente."),
   tradeName: optionalText,
   seller: optionalText,
+  routeWeekdays: z.array(z.coerce.number().int().min(1).max(5)).default([]),
   cep: optionalText,
   street: optionalText,
   number: optionalText,
@@ -57,6 +58,7 @@ function parseCustomerForm(formData: FormData) {
     name: formData.get("name")?.toString(),
     tradeName: formData.get("tradeName")?.toString(),
     seller: formData.get("seller")?.toString(),
+    routeWeekdays: formData.getAll("routeWeekdays").map((value) => Number(value)),
     cep: formData.get("cep")?.toString(),
     street: formData.get("street")?.toString(),
     number: formData.get("number")?.toString(),
@@ -97,7 +99,9 @@ export async function createCustomerAction(formData: FormData) {
 
   const db = getDb();
   ensureCustomerSchema(db);
-  db.prepare(
+  const customerId = randomUUID();
+  const run = db.transaction(() => {
+    db.prepare(
     `
       INSERT INTO customers (
         id, code, cnpj, state_tax_id, taxpayer, name, trade_name, seller, cep,
@@ -112,8 +116,8 @@ export async function createCustomerAction(formData: FormData) {
         @registered_at, @last_updated_at, @blocked, @block_reason, @customer_type_code, datetime('now')
       )
     `
-  ).run({
-    id: randomUUID(),
+    ).run({
+    id: customerId,
     code: parsed.code,
     cnpj: parsed.cnpj,
     state_tax_id: parsed.stateTaxId,
@@ -140,7 +144,10 @@ export async function createCustomerAction(formData: FormData) {
     blocked: parsed.blocked ? 1 : 0,
     block_reason: parsed.blockReason,
     customer_type_code: parsed.customerTypeCode,
+    });
+    syncCustomerRouteDays(db, customerId, parsed.routeWeekdays);
   });
+  run();
 
   revalidatePath("/clientes");
   redirect("/clientes");
@@ -153,8 +160,10 @@ export async function updateCustomerAction(formData: FormData) {
 
   const db = getDb();
   ensureCustomerSchema(db);
-  const result = db
-    .prepare(
+  let changes = 0;
+  const run = db.transaction(() => {
+    const result = db
+      .prepare(
       `
         UPDATE customers SET
           code=@code,
@@ -186,8 +195,8 @@ export async function updateCustomerAction(formData: FormData) {
           updated_at=datetime('now')
         WHERE id=@id
       `
-    )
-    .run({
+      )
+      .run({
       id: parsed.id,
       code: parsed.code,
       cnpj: parsed.cnpj,
@@ -216,8 +225,12 @@ export async function updateCustomerAction(formData: FormData) {
       block_reason: parsed.blockReason,
       customer_type_code: parsed.customerTypeCode,
     });
+    changes = result.changes;
+    syncCustomerRouteDays(db, parsed.id, parsed.routeWeekdays);
+  });
+  run();
 
-  if (result.changes === 0) throw new Error("Cliente não encontrado.");
+  if (changes === 0) throw new Error("Cliente não encontrado.");
 
   revalidatePath("/clientes");
   revalidatePath(`/clientes/${parsed.id}/editar`);

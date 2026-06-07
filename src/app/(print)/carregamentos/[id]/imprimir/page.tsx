@@ -155,7 +155,7 @@ export default async function PrintCarregamentoPage({
             <div className="text-xs font-extrabold">Pedidos no carregamento</div>
             <div className="text-[10px] text-black/60">{data.orders.length} pedidos</div>
           </div>
-          <div className="mt-2 grid grid-cols-3 gap-x-2 gap-y-1 text-[10px] leading-tight">
+          <div className="mt-2 space-y-1 text-[10px] leading-tight">
             {data.orders.map((o) => (
               <div key={o.id} className="rounded-md border px-2 py-1">
                 <div className="font-semibold">#{o.id}</div>
@@ -168,7 +168,7 @@ export default async function PrintCarregamentoPage({
               </div>
             ))}
             {data.orders.length === 0 ? (
-              <div className="col-span-3 text-black/60">Nenhum pedido vinculado.</div>
+              <div className="text-black/60">Nenhum pedido vinculado.</div>
             ) : null}
           </div>
         </div>

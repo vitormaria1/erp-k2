@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import type { CustomerRow } from "@/lib/queries";
+import { ROUTE_WEEKDAYS, routeWeekdayLabel } from "@/lib/customer-schema";
 
 type CustomerFormProps = {
   action: (formData: FormData) => Promise<void>;
@@ -79,6 +80,41 @@ function Fieldset({ title, children }: { title: string; children: React.ReactNod
   );
 }
 
+function CustomerRoutesField({ customer }: { customer?: CustomerRow }) {
+  const selected = new Set(
+    (customer?.routeWeekdaysCsv ?? "")
+      .split(",")
+      .map((value) => Number(value))
+      .filter((value) => Number.isInteger(value))
+  );
+
+  return (
+    <section className="rounded-2xl border bg-black/[0.02] p-4">
+      <h2 className="text-sm font-semibold">Rotas</h2>
+      <div className="mt-1 text-sm text-[var(--muted)]">
+        Defina os dias padrão do cliente. A aba Rotas também adiciona automaticamente os dias usados.
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-5">
+        {ROUTE_WEEKDAYS.map((weekday) => (
+          <label
+            key={weekday}
+            className="flex items-center gap-3 rounded-xl border bg-[var(--card)] px-4 py-3 text-sm"
+          >
+            <input
+              name="routeWeekdays"
+              type="checkbox"
+              value={weekday}
+              defaultChecked={selected.has(weekday)}
+              className="h-4 w-4"
+            />
+            <span>{routeWeekdayLabel(weekday)}</span>
+          </label>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export function CustomerForm({ action, customer, submitLabel }: CustomerFormProps) {
   return (
     <form action={action} className="mt-6 space-y-4 rounded-2xl border bg-[var(--card)] p-5 shadow-sm">
@@ -110,6 +146,8 @@ export function CustomerForm({ action, customer, submitLabel }: CustomerFormProp
           <TextField key={field.name} field={field} customer={customer} />
         ))}
       </Fieldset>
+
+      <CustomerRoutesField customer={customer} />
 
       <Fieldset title="Controle do cadastro">
         {controlFields.map((field) => (

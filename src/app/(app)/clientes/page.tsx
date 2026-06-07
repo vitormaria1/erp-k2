@@ -116,6 +116,7 @@ export default async function ClientesPage(props: {
               <th className="px-4 py-3">Nome</th>
               <th className="px-4 py-3">Fantasia</th>
               <th className="px-4 py-3">Vendedor</th>
+              <th className="px-4 py-3">Rota</th>
               <th className="px-4 py-3">CPF/CNPJ</th>
               <th className="px-4 py-3">IE</th>
               <th className="px-4 py-3">TP Cad.</th>
@@ -148,6 +149,7 @@ export default async function ClientesPage(props: {
                 <td className="px-4 py-3 font-semibold">{c.name}</td>
                 <td className="px-4 py-3 text-[var(--muted)]">{c.tradeName ?? "-"}</td>
                 <td className="px-4 py-3">{c.seller ?? "-"}</td>
+                <td className="px-4 py-3">{c.routeLabels ?? "-"}</td>
                 <td className="px-4 py-3">{c.cnpj ?? "-"}</td>
                 <td className="px-4 py-3">{c.stateTaxId ?? "-"}</td>
                 <td className="px-4 py-3">{c.customerTypeCode ?? "-"}</td>
@@ -182,7 +184,7 @@ export default async function ClientesPage(props: {
             ))}
             {rows.length === 0 ? (
               <tr>
-                <td className="px-4 py-8 text-[var(--muted)]" colSpan={27}>
+                <td className="px-4 py-8 text-[var(--muted)]" colSpan={28}>
                   Nenhum cliente encontrado.
                 </td>
               </tr>

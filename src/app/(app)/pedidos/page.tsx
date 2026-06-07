@@ -638,6 +638,13 @@ export default async function PedidosPage(props: {
                       ) : null}
                     </div>
                     <div className="flex flex-wrap gap-2">
+                      <Link
+                        href={`/pedidos/${order.id}/imprimir`}
+                        target="_blank"
+                        className="rounded-lg border px-3 py-1.5 text-xs font-semibold"
+                      >
+                        Reimprimir
+                      </Link>
                       <form action="/api/fiscal/orders/preview-danfe" method="post">
                         <input type="hidden" name="orderId" value={order.id} />
                         <button className="rounded-lg border px-3 py-1.5 text-xs font-semibold">

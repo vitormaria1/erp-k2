@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
 import { getDb } from "@/lib/db";
+import { ensureCustomerRouteDay, ensureCustomerSchema } from "@/lib/customer-schema";
 
 function assertWeekStartIso(value: string) {
   // Expect YYYY-MM-DD
@@ -40,6 +41,7 @@ export async function addRouteEntryAction(formData: FormData) {
   const weekStart = assertWeekStartIso(parsed.weekStart);
 
   const db = getDb();
+  ensureCustomerSchema(db);
   const run = db.transaction(() => {
     const weekId = getOrCreateRouteWeek(db, weekStart);
 
@@ -56,6 +58,7 @@ export async function addRouteEntryAction(formData: FormData) {
       VALUES (?, ?, ?, ?, 'NONE', ?, ?, datetime('now'))
     `
     ).run(randomUUID(), weekId, parsed.weekday, parsed.customerId, parsed.notes?.trim() || null, nextSort);
+    ensureCustomerRouteDay(db, parsed.customerId, parsed.weekday);
   });
   run();
 }
@@ -139,4 +142,3 @@ export async function moveRouteEntryAction(formData: FormData) {
 
   run();
 }
-
