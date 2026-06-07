@@ -86,9 +86,90 @@ export function OrderItemsClient({ products }: { products: ProductOpt[] }) {
     setItems((prev) => prev.filter((_, i) => i !== idx));
   }
 
+  function updateQuantityAt(idx: number, nextValue: string) {
+    if (!nextValue.trim().length) return;
+    const nextQuantity = Number(nextValue);
+    if (!Number.isFinite(nextQuantity) || nextQuantity <= 0) return;
+    setItems((prev) =>
+      prev.map((item, itemIdx) => {
+        if (itemIdx !== idx) return item;
+        return { ...item, quantity: nextQuantity };
+      })
+    );
+  }
+
   return (
     <div className="mt-3 space-y-3">
       <input type="hidden" name="itemsJson" value={JSON.stringify(items)} />
+
+      <div className="overflow-hidden rounded-xl border">
+        <table className="w-full text-sm">
+          <thead className="bg-black/[0.02] text-left text-[var(--muted)]">
+            <tr>
+              <th className="px-3 py-2">Produto</th>
+              <th className="px-3 py-2">Qtd</th>
+              <th className="px-3 py-2">Preço</th>
+              <th className="px-3 py-2" />
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((it, idx) => {
+              const p = productMap.get(it.productId);
+              return (
+                <tr key={`${it.productId}-${idx}`} className="border-t">
+                  <td className="px-3 py-2">
+                    {p ? (
+                      <>
+                        <div className="font-semibold">{p.description}</div>
+                        <div className="text-xs text-[var(--muted)]">
+                          {p.reference} · {p.unit}
+                        </div>
+                      </>
+                    ) : (
+                      it.productId
+                    )}
+                  </td>
+                  <td className="px-3 py-2">
+                    <input
+                      className="w-24 rounded-lg border bg-[var(--card)] px-2 py-1.5 text-sm"
+                      type="number"
+                      min="0.001"
+                      step="0.001"
+                      value={it.quantity}
+                      onChange={(e) => updateQuantityAt(idx, e.target.value)}
+                      aria-label={`Quantidade do item ${p?.description ?? it.productId}`}
+                    />
+                  </td>
+                  <td className="px-3 py-2">
+                    {typeof it.unitPrice === "number" ? it.unitPrice.toFixed(2) : "-"}
+                  </td>
+                  <td className="px-3 py-2">
+                    <button
+                      type="button"
+                      className="text-sm text-[var(--k2-red-2)]"
+                      onClick={() => removeAt(idx)}
+                    >
+                      Remover
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+            {items.length === 0 ? (
+              <tr>
+                <td className="px-3 py-4 text-[var(--muted)]" colSpan={4}>
+                  Nenhum item adicionado.
+                </td>
+              </tr>
+            ) : null}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="flex items-center justify-between rounded-2xl border bg-black/[0.03] px-4 py-3">
+        <div className="text-sm text-[var(--muted)]">Total atual do pedido</div>
+        <div className="text-lg font-semibold">R$ {orderTotal.toFixed(2)}</div>
+      </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.85fr)]">
         <div className="rounded-2xl border bg-black/[0.015] p-3">
@@ -211,65 +292,6 @@ export function OrderItemsClient({ products }: { products: ProductOpt[] }) {
             Adicionar item
           </button>
         </div>
-      </div>
-
-      <div className="overflow-hidden rounded-xl border">
-        <table className="w-full text-sm">
-          <thead className="bg-black/[0.02] text-left text-[var(--muted)]">
-            <tr>
-              <th className="px-3 py-2">Produto</th>
-              <th className="px-3 py-2">Qtd</th>
-              <th className="px-3 py-2">Preço</th>
-              <th className="px-3 py-2" />
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((it, idx) => {
-              const p = productMap.get(it.productId);
-              return (
-                <tr key={`${it.productId}-${idx}`} className="border-t">
-                  <td className="px-3 py-2">
-                    {p ? (
-                      <>
-                        <div className="font-semibold">{p.description}</div>
-                        <div className="text-xs text-[var(--muted)]">
-                          {p.reference} · {p.unit}
-                        </div>
-                      </>
-                    ) : (
-                      it.productId
-                    )}
-                  </td>
-                  <td className="px-3 py-2">{it.quantity}</td>
-                  <td className="px-3 py-2">
-                    {typeof it.unitPrice === "number" ? it.unitPrice.toFixed(2) : "-"}
-                  </td>
-                  <td className="px-3 py-2">
-                    <button
-                      type="button"
-                      className="text-sm text-[var(--k2-red-2)]"
-                      onClick={() => removeAt(idx)}
-                    >
-                      Remover
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-            {items.length === 0 ? (
-              <tr>
-                <td className="px-3 py-4 text-[var(--muted)]" colSpan={4}>
-                  Nenhum item adicionado.
-                </td>
-              </tr>
-            ) : null}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="flex items-center justify-between rounded-2xl border bg-black/[0.03] px-4 py-3">
-        <div className="text-sm text-[var(--muted)]">Total atual do pedido</div>
-        <div className="text-lg font-semibold">R$ {orderTotal.toFixed(2)}</div>
       </div>
     </div>
   );
