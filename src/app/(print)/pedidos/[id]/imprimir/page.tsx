@@ -8,38 +8,96 @@ import { formatDateTime } from "@/lib/datetime";
 type ItemRow = {
   code: string;
   name: string;
+  unit: string | null;
   quantity: number;
   unitPrice: number;
   total: number;
 };
 
+type PrintableOrder = {
+  id: number;
+  createdAt: string;
+  notes: string | null;
+  customerName: string;
+  customerTradeName: string | null;
+  customerCode: string | null;
+  customerCnpj: string | null;
+  customerSeller: string | null;
+  customerStreet: string | null;
+  customerNumber: string | null;
+  customerComplement: string | null;
+  customerNeighborhood: string | null;
+  customerCity: string | null;
+  customerUf: string | null;
+  customerCep: string | null;
+};
+
+function formatCustomerAddress(order: PrintableOrder) {
+  const line1 = [order.customerStreet, order.customerNumber].filter(Boolean).join(", ");
+  const line1WithComplement = [line1, order.customerComplement].filter(Boolean).join(" - ");
+  const line2 = [order.customerNeighborhood, order.customerCity, order.customerUf].filter(Boolean).join(" - ");
+  const line3 = order.customerCep ? `CEP ${order.customerCep}` : "";
+
+  return [line1WithComplement, line2, line3].filter(Boolean);
+}
+
 function getOrderPrintable(orderId: number) {
   const db = getDb();
-  const order = db
-    .prepare(
+  let order: PrintableOrder | undefined;
+
+  try {
+    order = db
+      .prepare(
+        `
+        SELECT
+          o.id as id,
+          o.created_at as createdAt,
+          o.notes as notes,
+          c.name as customerName,
+          c.trade_name as customerTradeName,
+          c.code as customerCode,
+          c.cnpj as customerCnpj,
+          c."Nome Rep." as customerSeller,
+          c.street as customerStreet,
+          c.number as customerNumber,
+          c.complement as customerComplement,
+          c.neighborhood as customerNeighborhood,
+          c.city as customerCity,
+          c.uf as customerUf,
+          c.cep as customerCep
+        FROM orders o
+        JOIN customers c ON c.id = o.customer_id
+        WHERE o.id = ?
       `
-      SELECT
-        o.id as id,
-        o.created_at as createdAt,
-        o.notes as notes,
-        c.name as customerName,
-        c.trade_name as customerTradeName,
-        c.cnpj as customerCnpj
-      FROM orders o
-      JOIN customers c ON c.id = o.customer_id
-      WHERE o.id = ?
-    `
-    )
-    .get(orderId) as
-    | {
-        id: number;
-        createdAt: string;
-        notes: string | null;
-        customerName: string;
-        customerTradeName: string | null;
-        customerCnpj: string | null;
-      }
-    | undefined;
+      )
+      .get(orderId) as PrintableOrder | undefined;
+  } catch {
+    order = db
+      .prepare(
+        `
+        SELECT
+          o.id as id,
+          o.created_at as createdAt,
+          o.notes as notes,
+          c.name as customerName,
+          c.trade_name as customerTradeName,
+          c.code as customerCode,
+          c.cnpj as customerCnpj,
+          NULL as customerSeller,
+          c.street as customerStreet,
+          c.number as customerNumber,
+          c.complement as customerComplement,
+          c.neighborhood as customerNeighborhood,
+          c.city as customerCity,
+          c.uf as customerUf,
+          c.cep as customerCep
+        FROM orders o
+        JOIN customers c ON c.id = o.customer_id
+        WHERE o.id = ?
+      `
+      )
+      .get(orderId) as PrintableOrder | undefined;
+  }
 
   if (!order) return null;
 
@@ -49,6 +107,7 @@ function getOrderPrintable(orderId: number) {
       SELECT
         p.reference as code,
         p.description as name,
+        p.unit as unit,
         oi.quantity as quantity,
         COALESCE(oi.unit_price, 0) as unitPrice,
         (COALESCE(oi.unit_price, 0) * oi.quantity) as total
@@ -79,6 +138,7 @@ export default async function PrintPedidoPage({
 
   const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
   const created = formatDateTime(order.createdAt);
+  const customerAddress = formatCustomerAddress(order);
 
   return (
     <div className="mx-auto max-w-3xl p-8 print:p-0">
@@ -98,7 +158,7 @@ export default async function PrintPedidoPage({
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-3 rounded-2xl border p-4">
+      <div className="mt-4 grid grid-cols-1 gap-4 rounded-2xl border p-4 md:grid-cols-2">
         <div>
           <div className="text-xs font-semibold uppercase tracking-wide text-black/60">Cliente</div>
           <div className="text-base font-bold">
@@ -109,8 +169,30 @@ export default async function PrintPedidoPage({
           ) : null}
           {order.customerCnpj ? <div className="text-sm text-black/70">{order.customerCnpj}</div> : null}
         </div>
-        {order.notes ? (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-black/60">Código do cliente</div>
+            <div className="text-sm">{order.customerCode || "-"}</div>
+          </div>
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-black/60">Vendedor</div>
+            <div className="text-sm">{order.customerSeller || "-"}</div>
+          </div>
+        </div>
+        <div className="md:col-span-2">
+          <div className="text-xs font-semibold uppercase tracking-wide text-black/60">Endereço</div>
+          {customerAddress.length ? (
+            customerAddress.map((line) => (
+              <div key={line} className="text-sm text-black/70">
+                {line}
+              </div>
+            ))
+          ) : (
+            <div className="text-sm text-black/70">Endereço não informado.</div>
+          )}
+        </div>
+        {order.notes ? (
+          <div className="md:col-span-2">
             <div className="text-xs font-semibold uppercase tracking-wide text-black/60">
               Observações
             </div>
@@ -125,6 +207,7 @@ export default async function PrintPedidoPage({
             <tr>
               <th className="px-4 py-3">Código</th>
               <th className="px-4 py-3">Produto</th>
+              <th className="px-4 py-3">Un.</th>
               <th className="px-4 py-3 text-right">Qtd</th>
               <th className="px-4 py-3 text-right">Vlr. unit.</th>
               <th className="px-4 py-3 text-right">Total</th>
@@ -135,6 +218,7 @@ export default async function PrintPedidoPage({
               <tr key={`${it.code}-${it.name}`} className="border-t">
                 <td className="px-4 py-3 font-semibold">{it.code}</td>
                 <td className="px-4 py-3">{it.name}</td>
+                <td className="px-4 py-3">{it.unit || "-"}</td>
                 <td className="px-4 py-3 text-right">{Number(it.quantity).toFixed(3)}</td>
                 <td className="px-4 py-3 text-right">{money.format(Number(it.unitPrice))}</td>
                 <td className="px-4 py-3 text-right font-semibold">{money.format(Number(it.total))}</td>
@@ -142,7 +226,7 @@ export default async function PrintPedidoPage({
             ))}
             {items.length === 0 ? (
               <tr>
-                <td className="px-4 py-8 text-black/60" colSpan={5}>
+                <td className="px-4 py-8 text-black/60" colSpan={6}>
                   Pedido sem itens.
                 </td>
               </tr>
