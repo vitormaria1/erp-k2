@@ -4,17 +4,19 @@ import * as React from "react";
 
 function fitPrintablePage() {
   const shell = document.getElementById("print-fit-shell");
-  const content = document.getElementById("print-fit-content");
-  if (!shell || !content) return;
+  const content = shell?.querySelector<HTMLElement>("[data-print-content]");
+  const slot = shell?.querySelector<HTMLElement>(".print-copy-slot");
+  if (!shell || !content || !slot) return;
 
   shell.style.setProperty("--print-scale", "1");
 
-  const shellRect = shell.getBoundingClientRect();
+  const slotRect = slot.getBoundingClientRect();
   const contentRect = content.getBoundingClientRect();
-  if (!shellRect.width || !shellRect.height || !contentRect.width || !contentRect.height) return;
+  if (!slotRect.width || !slotRect.height || !contentRect.width || !contentRect.height) return;
 
-  const widthScale = shellRect.width / contentRect.width;
-  const heightScale = shellRect.height / contentRect.height;
+  const availableHeight = slotRect.height;
+  const widthScale = slotRect.width / contentRect.width;
+  const heightScale = availableHeight / contentRect.height;
   const scale = Math.min(1, widthScale, heightScale);
 
   shell.style.setProperty("--print-scale", String(scale));

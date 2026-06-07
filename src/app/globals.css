@@ -130,4 +130,9 @@ body {
     transform: scale(var(--print-scale));
     transform-origin: top left;
   }
+
+  .print-copy-slot {
+    height: 100%;
+    break-inside: avoid;
+  }
 }
