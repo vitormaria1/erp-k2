@@ -92,84 +92,90 @@ export default async function PrintCarregamentoPage({
       className="loading-print-shell mx-auto w-full max-w-[210mm] p-3 print:w-[190mm] print:p-0"
     >
       <PrintOnLoad />
-      <div id="print-fit-content" className="loading-print-content rounded-2xl bg-white">
-        <div className="flex items-start justify-between border-b pb-2">
-          <div className="flex items-center gap-3">
-            <Image src="/k2-logo.jpeg" alt="K2 Salgados" width={52} height={52} priority />
-            <div>
-              <div className="text-lg font-extrabold tracking-tight">K2 Salgados</div>
-              <div className="text-[11px] text-black/70">Carregamento (lista de separação)</div>
-            </div>
-          </div>
-          <div className="text-right">
-            <div className="text-[11px] text-black/70">Criado em</div>
-            <div className="text-xs font-bold">{created}</div>
-            <div className="max-w-[200px] text-[10px] text-black/60 break-all">{data.loading.id}</div>
-          </div>
-        </div>
-
-        {data.loading.notes ? (
-          <div className="mt-2 rounded-xl border p-2 text-[11px] leading-tight">
-            <div className="text-[10px] font-semibold uppercase tracking-wide text-black/60">
-              Observações
-            </div>
-            <div className="mt-0.5 line-clamp-2">{data.loading.notes}</div>
-          </div>
-        ) : null}
-
-        <div className="mt-2 overflow-hidden rounded-xl border">
-          <table className="w-full table-fixed text-[11px] leading-tight">
-            <thead className="bg-black/[0.03] text-left">
-              <tr>
-                <th className="w-[56px] px-2 py-1.5">Código</th>
-                <th className="px-2 py-1.5">Produto</th>
-                <th className="w-[96px] px-2 py-1.5 text-right">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.totals.map((it) => (
-                <tr key={`${it.code}-${it.name}`} className="border-t">
-                  <td className="px-2 py-1 font-semibold">{it.code}</td>
-                  <td className="px-2 py-1">
-                    <div className="truncate">{it.name}</div>
-                    <div className="text-[10px] text-black/60">{it.unit}</div>
-                  </td>
-                  <td className="px-2 py-1 text-right font-semibold">
-                    {formatQty(it.unit, Number(it.totalQty))} {it.unit}
-                  </td>
-                </tr>
-              ))}
-              {data.totals.length === 0 ? (
-                <tr>
-                  <td className="px-2 py-4 text-black/60" colSpan={3}>
-                    Nenhum item.
-                  </td>
-                </tr>
-              ) : null}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="mt-2 rounded-xl border p-2">
-          <div className="flex items-center justify-between">
-            <div className="text-xs font-extrabold">Pedidos no carregamento</div>
-            <div className="text-[10px] text-black/60">{data.orders.length} pedidos</div>
-          </div>
-          <div className="mt-2 space-y-1 text-[10px] leading-tight">
-            {data.orders.map((o) => (
-              <div key={o.id} className="rounded-md border px-2 py-1">
-                <div className="font-semibold">#{o.id}</div>
-                <div className="truncate font-medium">
-                  {o.customerTradeName ? o.customerTradeName : o.customerName}
-                </div>
-                {o.customerTradeName ? (
-                  <div className="truncate text-black/60">{o.customerName}</div>
-                ) : null}
+      <div className="print-copy-slot">
+        <div
+          id="print-fit-content"
+          data-print-content
+          className="loading-print-content rounded-2xl bg-white"
+        >
+          <div className="flex items-start justify-between border-b pb-2">
+            <div className="flex items-center gap-3">
+              <Image src="/k2-logo.jpeg" alt="K2 Salgados" width={52} height={52} priority />
+              <div>
+                <div className="text-lg font-extrabold tracking-tight">K2 Salgados</div>
+                <div className="text-[11px] text-black/70">Carregamento (lista de separação)</div>
               </div>
-            ))}
-            {data.orders.length === 0 ? (
-              <div className="text-black/60">Nenhum pedido vinculado.</div>
-            ) : null}
+            </div>
+            <div className="text-right">
+              <div className="text-[11px] text-black/70">Criado em</div>
+              <div className="text-xs font-bold">{created}</div>
+              <div className="max-w-[200px] text-[10px] text-black/60 break-all">{data.loading.id}</div>
+            </div>
+          </div>
+
+          {data.loading.notes ? (
+            <div className="mt-2 rounded-xl border p-2 text-[10px] leading-tight">
+              <div className="text-[9px] font-semibold uppercase tracking-wide text-black/60">
+                Observações
+              </div>
+              <div className="mt-0.5 line-clamp-1">{data.loading.notes}</div>
+            </div>
+          ) : null}
+
+          <div className="mt-2 overflow-hidden rounded-xl border">
+            <table className="w-full table-fixed text-[10px] leading-tight">
+              <thead className="bg-black/[0.03] text-left">
+                <tr>
+                  <th className="w-[56px] px-2 py-1">Código</th>
+                  <th className="px-2 py-1">Produto</th>
+                  <th className="w-[96px] px-2 py-1 text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.totals.map((it) => (
+                  <tr key={`${it.code}-${it.name}`} className="border-t">
+                    <td className="px-2 py-0.5 font-semibold">{it.code}</td>
+                    <td className="px-2 py-0.5">
+                      <div className="truncate">{it.name}</div>
+                      <div className="text-[9px] text-black/60">{it.unit}</div>
+                    </td>
+                    <td className="px-2 py-0.5 text-right font-semibold">
+                      {formatQty(it.unit, Number(it.totalQty))} {it.unit}
+                    </td>
+                  </tr>
+                ))}
+                {data.totals.length === 0 ? (
+                  <tr>
+                    <td className="px-2 py-4 text-black/60" colSpan={3}>
+                      Nenhum item.
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="mt-2 rounded-xl border p-2">
+            <div className="flex items-center justify-between">
+              <div className="text-[11px] font-extrabold">Pedidos no carregamento</div>
+              <div className="text-[9px] text-black/60">{data.orders.length} pedidos</div>
+            </div>
+            <div className="mt-1 space-y-0.5 text-[9px] leading-tight">
+              {data.orders.map((o) => (
+                <div key={o.id} className="truncate rounded-md border px-2 py-0.5">
+                  <span className="font-semibold">#{o.id}</span>{" "}
+                  <span className="font-medium">
+                    {o.customerTradeName ? o.customerTradeName : o.customerName}
+                  </span>
+                  {o.customerTradeName ? (
+                    <span className="text-black/60"> / {o.customerName}</span>
+                  ) : null}
+                </div>
+              ))}
+              {data.orders.length === 0 ? (
+                <div className="text-black/60">Nenhum pedido vinculado.</div>
+              ) : null}
+            </div>
           </div>
         </div>
       </div>
