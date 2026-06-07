@@ -156,7 +156,8 @@ export async function createCustomerAction(formData: FormData) {
 export async function updateCustomerAction(formData: FormData) {
   const parsed = parseCustomerForm(formData);
   if (!parsed.id) throw new Error("Cliente inválido para edição.");
-  ensureUniqueCode(parsed.code, parsed.id);
+  const customerId = parsed.id;
+  ensureUniqueCode(parsed.code, customerId);
 
   const db = getDb();
   ensureCustomerSchema(db);
@@ -197,7 +198,7 @@ export async function updateCustomerAction(formData: FormData) {
       `
       )
       .run({
-      id: parsed.id,
+      id: customerId,
       code: parsed.code,
       cnpj: parsed.cnpj,
       state_tax_id: parsed.stateTaxId,
@@ -226,13 +227,13 @@ export async function updateCustomerAction(formData: FormData) {
       customer_type_code: parsed.customerTypeCode,
     });
     changes = result.changes;
-    syncCustomerRouteDays(db, parsed.id, parsed.routeWeekdays);
+    syncCustomerRouteDays(db, customerId, parsed.routeWeekdays);
   });
   run();
 
   if (changes === 0) throw new Error("Cliente não encontrado.");
 
   revalidatePath("/clientes");
-  revalidatePath(`/clientes/${parsed.id}/editar`);
+  revalidatePath(`/clientes/${customerId}/editar`);
   redirect("/clientes");
 }
