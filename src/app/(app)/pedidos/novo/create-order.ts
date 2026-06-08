@@ -3,6 +3,12 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
 import { getDb } from "@/lib/db";
+import {
+  ensureOrderPaymentSchema,
+  getDefaultReceivableDueDate,
+  ORDER_PAYMENT_METHOD_VALUES,
+  type OrderPaymentMethod,
+} from "@/lib/payments";
 
 export const itemSchema = z.object({
   productId: z.string().min(1),
@@ -14,6 +20,8 @@ export const createSchema = z.object({
   customerId: z.string().min(1),
   notes: z.string().optional(),
   itemsJson: z.string().min(2),
+  paymentMethod: z.enum(ORDER_PAYMENT_METHOD_VALUES),
+  dueDate: z.string().optional(),
 });
 
 export function parseCreateOrderFormData(formData: FormData) {
@@ -21,6 +29,8 @@ export function parseCreateOrderFormData(formData: FormData) {
     customerId: formData.get("customerId"),
     notes: formData.get("notes")?.toString(),
     itemsJson: formData.get("itemsJson")?.toString(),
+    paymentMethod: formData.get("paymentMethod"),
+    dueDate: formData.get("dueDate")?.toString(),
   });
 
   const items = z.array(itemSchema).parse(JSON.parse(parsed.itemsJson));
@@ -31,10 +41,11 @@ export function parseCreateOrderFormData(formData: FormData) {
 
 export function createOrder(input: ReturnType<typeof parseCreateOrderFormData>) {
   const db = getDb();
+  ensureOrderPaymentSchema(db);
   const run = db.transaction(() => {
     const result = db
-      .prepare("INSERT INTO orders (customer_id, status, notes) VALUES (?, 'FEITO', ?)")
-      .run(input.customerId, input.notes ?? null);
+      .prepare("INSERT INTO orders (customer_id, status, notes, payment_method) VALUES (?, 'FEITO', ?, ?)")
+      .run(input.customerId, input.notes ?? null, input.paymentMethod);
 
     const orderId = Number(result.lastInsertRowid);
 
@@ -84,11 +95,10 @@ export function createOrder(input: ReturnType<typeof parseCreateOrderFormData>) 
 
     const amount = input.items.reduce((acc, it) => acc + (it.unitPrice ?? 0) * it.quantity, 0);
     if (amount > 0) {
-      const due = new Date();
-      due.setDate(due.getDate() + 7);
+      const dueDate = getDefaultReceivableDueDate(input.paymentMethod as OrderPaymentMethod, input.dueDate);
       db.prepare(
-        "INSERT INTO receivables (id, customer_id, order_id, status, method, amount, due_date) VALUES (?, ?, ?, 'OPEN', 'BOLETO', ?, ?)"
-      ).run(randomUUID(), input.customerId, orderId, amount, due.toISOString());
+        "INSERT INTO receivables (id, customer_id, order_id, status, method, amount, due_date) VALUES (?, ?, ?, 'OPEN', ?, ?, ?)"
+      ).run(randomUUID(), input.customerId, orderId, input.paymentMethod, amount, dueDate);
     }
 
     return orderId;

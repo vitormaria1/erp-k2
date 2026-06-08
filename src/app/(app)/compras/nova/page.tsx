@@ -62,6 +62,34 @@ export default function NovaCompraPage() {
           </label>
         </div>
 
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+          <label className="block space-y-1">
+            <div className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Vencimento</div>
+            <input
+              name="dueDate"
+              type="date"
+              className="w-full rounded-xl border bg-[var(--card)] px-4 py-3 text-sm"
+            />
+          </label>
+          <label className="block space-y-1">
+            <div className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Forma de pagamento</div>
+            <select name="paymentMethod" className="w-full rounded-xl border bg-[var(--card)] px-4 py-3 text-sm">
+              <option value="BOLETO">Boleto</option>
+              <option value="PIX">PIX</option>
+              <option value="TRANSFER">Transferencia</option>
+              <option value="CASH">Dinheiro</option>
+            </select>
+          </label>
+          <label className="block space-y-1">
+            <div className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Ref. pagamento</div>
+            <input
+              name="paymentRef"
+              className="w-full rounded-xl border bg-[var(--card)] px-4 py-3 text-sm"
+              placeholder="Linha digitavel / identificador"
+            />
+          </label>
+        </div>
+
         <label className="block space-y-1">
           <div className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Observações</div>
           <input name="notes" className="w-full rounded-xl border bg-[var(--card)] px-4 py-3 text-sm" placeholder="Opcional" />

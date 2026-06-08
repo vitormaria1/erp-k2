@@ -3,7 +3,6 @@ export const ORDER_STATUS_VALUES = [
   "SEPARADO",
   "ENVIADO",
   "ENTREGUE",
-  "PAGO",
 ] as const;
 
 export type OrderStatus = (typeof ORDER_STATUS_VALUES)[number];
@@ -24,10 +23,6 @@ const ORDER_STATUS_META: Record<OrderStatus, { label: string; className: string 
   ENTREGUE: {
     label: "Entregue",
     className: "bg-emerald-100 text-emerald-800",
-  },
-  PAGO: {
-    label: "Pago",
-    className: "bg-green-100 text-green-800",
   },
 };
 
@@ -58,6 +53,8 @@ export function normalizeOrderStatus(status: string): OrderStatus | string {
     case "READY":
       return "ENVIADO";
     case "DELIVERED":
+      return "ENTREGUE";
+    case "PAGO":
       return "ENTREGUE";
     case "CANCELED":
       return "FEITO";

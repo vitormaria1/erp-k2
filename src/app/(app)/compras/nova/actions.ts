@@ -6,6 +6,7 @@ import { z } from "zod";
 import { redirect } from "next/navigation";
 
 import { getDb } from "@/lib/db";
+import { createPayableForPurchaseInvoice, ensureFinancialSchema } from "@/lib/financial-ledger";
 import { propagateCostFromInput } from "@/lib/inventory";
 
 const itemSchema = z.object({
@@ -18,6 +19,9 @@ const createSchema = z.object({
   supplierName: z.string().optional(),
   number: z.string().optional(),
   issuedAt: z.string().optional(),
+  dueDate: z.string().optional(),
+  paymentMethod: z.enum(["BOLETO", "PIX", "TRANSFER", "CASH"]).default("BOLETO"),
+  paymentRef: z.string().optional(),
   notes: z.string().optional(),
   itemsJson: z.string().min(2),
 });
@@ -27,6 +31,9 @@ export async function createPurchaseInvoiceAction(formData: FormData) {
     supplierName: formData.get("supplierName")?.toString(),
     number: formData.get("number")?.toString(),
     issuedAt: formData.get("issuedAt")?.toString(),
+    dueDate: formData.get("dueDate")?.toString(),
+    paymentMethod: formData.get("paymentMethod")?.toString(),
+    paymentRef: formData.get("paymentRef")?.toString(),
     notes: formData.get("notes")?.toString(),
     itemsJson: formData.get("itemsJson")?.toString(),
   });
@@ -40,6 +47,8 @@ export async function createPurchaseInvoiceAction(formData: FormData) {
   const touched = new Set<string>();
 
   const run = db.transaction(() => {
+    ensureFinancialSchema(db);
+
     db.prepare(
       "INSERT INTO purchase_invoices (id, supplier_name, number, issued_at, status, notes) VALUES (?, ?, ?, ?, 'POSTED', ?)"
     ).run(
@@ -94,6 +103,17 @@ export async function createPurchaseInvoiceAction(formData: FormData) {
       );
       touched.add(it.productId);
     }
+
+    const totalAmount = items.reduce((sum, item) => sum + item.quantity * item.unitCost, 0);
+    createPayableForPurchaseInvoice({
+      db,
+      purchaseInvoiceId,
+      supplierName: parsed.supplierName?.trim() || null,
+      amount: totalAmount,
+      method: parsed.paymentMethod,
+      dueDate: parsed.dueDate?.trim() || parsed.issuedAt?.trim() || new Date().toISOString(),
+      paymentRef: parsed.paymentRef?.trim() || null,
+    });
   });
 
   run();

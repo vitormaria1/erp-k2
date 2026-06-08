@@ -7,19 +7,44 @@ import { z } from "zod";
 
 import { getDb } from "@/lib/db";
 import {
+  ensureFinancialSchema,
+  updateReceivablePaymentMethod,
+  updatePayableLedgerStatus,
+  updateReceivableLedgerStatus,
+} from "@/lib/financial-ledger";
+import { ORDER_PAYMENT_METHOD_VALUES } from "@/lib/payments";
+import {
   closeRouteOrder,
   startRouteClosure,
   updateOrderStatusWithFinancialSync,
-  updateReceivableStatusWithOrderSync,
 } from "@/lib/order-finance-sync";
 import { isAuthenticated } from "@/lib/simple-auth";
 
 import { ORDER_STATUS_VALUES } from "../pedidos/status";
 
 const receivableSchema = z.object({ receivableId: z.string().min(1) });
-
 const receivableStatusSchema = z.object({
   status: z.enum(["OPEN", "PAID", "OVERDUE", "CANCELED"]),
+  effectiveDate: z.string().optional(),
+  method: z.enum(ORDER_PAYMENT_METHOD_VALUES),
+  dueDate: z.string().optional(),
+});
+
+const payablePaymentSchema = z.object({
+  payableId: z.string().min(1),
+  effectiveDate: z.string().optional(),
+});
+
+const receivableSettlementSchema = z.object({
+  receivableId: z.string().min(1),
+  effectiveDate: z.string().optional(),
+  method: z.enum(ORDER_PAYMENT_METHOD_VALUES),
+  dueDate: z.string().optional(),
+});
+
+const payableStatusSchema = z.object({
+  status: z.enum(["PENDING", "PAID", "CANCELED"]),
+  effectiveDate: z.string().optional(),
 });
 
 const orderStatusSchema = z.object({
@@ -29,6 +54,7 @@ const orderStatusSchema = z.object({
 const routeCloseSchema = z.object({
   orderId: z.coerce.number().int().positive(),
   mode: z.enum(["PAID", "OPEN"]),
+  effectiveDate: z.string().optional(),
 });
 
 const routeStartSchema = z.object({
@@ -42,6 +68,7 @@ function fakeLinhaDigitavel() {
 function revalidateFinanceViews() {
   revalidatePath("/financeiro");
   revalidatePath("/pedidos");
+  revalidatePath("/compras");
 }
 
 export async function gerarBoletoMockAction(formData: FormData) {
@@ -98,12 +125,22 @@ export async function updateReceivableStatusAction(receivableId: string, formDat
     throw new Error("Unauthorized");
   }
 
-  const { status } = receivableStatusSchema.parse({
+  const { status, effectiveDate, method, dueDate } = receivableStatusSchema.parse({
     status: formData.get("status"),
+    effectiveDate: formData.get("effectiveDate")?.toString(),
+    method: formData.get("method"),
+    dueDate: formData.get("dueDate")?.toString(),
   });
 
   const db = getDb();
-  updateReceivableStatusWithOrderSync(db, receivableId, status);
+  ensureFinancialSchema(db);
+  updateReceivablePaymentMethod({ db, receivableId, method, dueDate });
+  updateReceivableLedgerStatus({
+    db,
+    receivableId,
+    status,
+    effectiveDate,
+  });
 
   revalidateFinanceViews();
 }
@@ -113,9 +150,53 @@ export async function settleReceivableAction(formData: FormData) {
     throw new Error("Unauthorized");
   }
 
-  const { receivableId } = receivableSchema.parse({ receivableId: formData.get("receivableId") });
+  const { receivableId, effectiveDate, method, dueDate } = receivableSettlementSchema.parse({
+    receivableId: formData.get("receivableId"),
+    effectiveDate: formData.get("effectiveDate")?.toString(),
+    method: formData.get("method"),
+    dueDate: formData.get("dueDate")?.toString(),
+  });
   const db = getDb();
-  updateReceivableStatusWithOrderSync(db, receivableId, "PAID");
+  ensureFinancialSchema(db);
+  updateReceivablePaymentMethod({ db, receivableId, method, dueDate });
+  updateReceivableLedgerStatus({ db, receivableId, status: "PAID", effectiveDate });
+  revalidateFinanceViews();
+}
+
+export async function updatePayableStatusAction(payableId: string, formData: FormData) {
+  if (!(await isAuthenticated())) {
+    throw new Error("Unauthorized");
+  }
+
+  const { status, effectiveDate } = payableStatusSchema.parse({
+    status: formData.get("status"),
+    effectiveDate: formData.get("effectiveDate")?.toString(),
+  });
+
+  const db = getDb();
+  ensureFinancialSchema(db);
+  updatePayableLedgerStatus({
+    db,
+    payableId,
+    status,
+    effectiveDate,
+  });
+
+  revalidateFinanceViews();
+}
+
+export async function settlePayableAction(formData: FormData) {
+  if (!(await isAuthenticated())) {
+    throw new Error("Unauthorized");
+  }
+
+  const { payableId, effectiveDate } = payablePaymentSchema.parse({
+    payableId: formData.get("payableId"),
+    effectiveDate: formData.get("effectiveDate")?.toString(),
+  });
+  const db = getDb();
+  ensureFinancialSchema(db);
+  updatePayableLedgerStatus({ db, payableId, status: "PAID", effectiveDate });
   revalidateFinanceViews();
 }
 
@@ -141,10 +222,11 @@ export async function closeRouteOrderAction(formData: FormData) {
   const { orderId, mode } = routeCloseSchema.parse({
     orderId: formData.get("orderId"),
     mode: formData.get("mode"),
+    effectiveDate: formData.get("effectiveDate")?.toString(),
   });
 
   const db = getDb();
-  closeRouteOrder(db, orderId, mode);
+  closeRouteOrder(db, orderId, mode, formData.get("effectiveDate")?.toString());
   revalidateFinanceViews();
 }
 

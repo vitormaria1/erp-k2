@@ -9,6 +9,7 @@ CREATE TABLE IF NOT EXISTS customers (
   taxpayer INTEGER NOT NULL DEFAULT 0,
   name TEXT NOT NULL,
   trade_name TEXT,
+  seller TEXT DEFAULT 'VANDO',
   cep TEXT,
   street TEXT,
   number TEXT,
@@ -54,6 +55,7 @@ CREATE TABLE IF NOT EXISTS orders (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   customer_id TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'PENDING', -- PENDING | IN_PRODUCTION | READY_TO_SHIP | COMPLETED | CANCELED
+  payment_method TEXT NOT NULL DEFAULT 'BOLETO', -- PIX | CASH | BOLETO
   notes TEXT,
   issued_at TEXT NOT NULL DEFAULT (datetime('now')),
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -137,6 +139,20 @@ CREATE TABLE IF NOT EXISTS boletos (
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   FOREIGN KEY (receivable_id) REFERENCES receivables(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS cash_movements (
+  id TEXT PRIMARY KEY,
+  kind TEXT NOT NULL,
+  source_type TEXT NOT NULL,
+  source_id TEXT NOT NULL,
+  method TEXT,
+  amount REAL NOT NULL,
+  effective_date TEXT NOT NULL,
+  note TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_cash_movements_source_kind ON cash_movements(source_type, source_id, kind);
 
 CREATE TABLE IF NOT EXISTS loadings (
   id TEXT PRIMARY KEY,
@@ -227,6 +243,24 @@ CREATE TABLE IF NOT EXISTS purchase_invoice_items (
 
 CREATE INDEX IF NOT EXISTS idx_purchase_invoice_items_invoice ON purchase_invoice_items(purchase_invoice_id);
 CREATE INDEX IF NOT EXISTS idx_purchase_invoice_items_product ON purchase_invoice_items(product_id);
+
+CREATE TABLE IF NOT EXISTS payables (
+  id TEXT PRIMARY KEY,
+  purchase_invoice_id TEXT,
+  supplier_name TEXT,
+  status TEXT NOT NULL DEFAULT 'PENDING',
+  method TEXT NOT NULL DEFAULT 'BOLETO',
+  amount REAL NOT NULL,
+  due_date TEXT NOT NULL,
+  paid_at TEXT,
+  payment_ref TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  FOREIGN KEY (purchase_invoice_id) REFERENCES purchase_invoices(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_payables_due_status ON payables(due_date, status);
+CREATE INDEX IF NOT EXISTS idx_payables_invoice_id ON payables(purchase_invoice_id);
 
 CREATE TABLE IF NOT EXISTS route_weeks (
   id TEXT PRIMARY KEY,

@@ -1,6 +1,12 @@
 import { randomUUID } from "node:crypto";
 
 import { getDb } from "../../lib/db";
+import {
+  ensureOrderPaymentSchema,
+  getFocusPaymentCode,
+  getPaymentIndicator,
+  type OrderPaymentMethod,
+} from "../../lib/payments";
 import { getIssuerConfig } from "../config/issuer";
 import { getNfeDefaults, pickNfeDefaultsByAmbiente } from "../config/nfe_defaults";
 import { getFiscalDbPool } from "../infra/pg";
@@ -21,6 +27,7 @@ type OrderRow = {
   id: number;
   createdAt: string;
   customerId: string;
+  paymentMethod: OrderPaymentMethod;
 
   customerName: string;
   customerTradeName: string | null;
@@ -49,6 +56,7 @@ type ItemRow = {
 
 function loadOrder(orderId: number): { order: OrderRow; items: ItemRow[] } {
   const db = getDb();
+  ensureOrderPaymentSchema(db);
 
   const order = db
     .prepare(
@@ -57,6 +65,7 @@ function loadOrder(orderId: number): { order: OrderRow; items: ItemRow[] } {
         o.id as id,
         o.created_at as createdAt,
         o.customer_id as customerId,
+        o.payment_method as paymentMethod,
 
         c.name as customerName,
         c.trade_name as customerTradeName,
@@ -127,6 +136,7 @@ export async function buildFiscalDraftFromOrder(orderId: number) {
   const nowIso = new Date().toISOString();
 
   const draftItems = [];
+  let totalAmount = 0;
   for (const it of items) {
     const fiscalData = await productFiscalRepo.getByProductId(it.productId);
     if (!fiscalData) {
@@ -142,6 +152,7 @@ export async function buildFiscalDraftFromOrder(orderId: number) {
       quantidade: Number(it.quantity),
       valorUnitario: Number(it.unitPrice),
     });
+    totalAmount += Number(it.quantity) * Number(it.unitPrice);
   }
 
   const missingAddress =
@@ -206,7 +217,15 @@ export async function buildFiscalDraftFromOrder(orderId: number) {
     itens: draftItems,
 
     // Ajustes específicos por estado/cliente podem vir por aqui, sem mexer na engine
-    focusPayloadOverrides: {},
+    focusPayloadOverrides: {
+      indicador_pagamento: getPaymentIndicator(order.paymentMethod),
+      formas_pagamento: [
+        {
+          forma_pagamento: getFocusPaymentCode(order.paymentMethod),
+          valor_pagamento: totalAmount,
+        },
+      ],
+    },
   };
 
   const serieNum = Number(draft.serie);

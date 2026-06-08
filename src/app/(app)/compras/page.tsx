@@ -1,7 +1,9 @@
+import { Fragment } from "react";
 import Link from "next/link";
 
 import { getDb } from "@/lib/db";
 import { formatDate, formatDateTime } from "@/lib/datetime";
+import { ensureFinancialSchema } from "@/lib/financial-ledger";
 
 type PurchaseInvoiceRow = {
   id: string;
@@ -9,6 +11,10 @@ type PurchaseInvoiceRow = {
   issuedAt: string | null;
   number: string | null;
   supplierName: string | null;
+  payableStatus: string | null;
+  payableMethod: string | null;
+  payableDueDate: string | null;
+  payableRef: string | null;
   itemsCount: number;
   totalQty: number;
   totalAmount: number;
@@ -24,8 +30,15 @@ type PurchaseInvoiceItemRow = {
   unitCost: number;
 };
 
+function getPayableLabel(status: string | null) {
+  if (status === "PAID") return "Pago";
+  if (status === "CANCELED") return "Cancelado";
+  return "Pendente";
+}
+
 function listPurchaseInvoices(opts: { q?: string; limit?: number } = {}): PurchaseInvoiceRow[] {
   const db = getDb();
+  ensureFinancialSchema(db);
   const q = (opts.q ?? "").trim();
   const limit = opts.limit ?? 100;
   return db
@@ -37,6 +50,10 @@ function listPurchaseInvoices(opts: { q?: string; limit?: number } = {}): Purcha
         pi.issued_at as issuedAt,
         pi.number as number,
         pi.supplier_name as supplierName,
+        pp.status as payableStatus,
+        pp.method as payableMethod,
+        pp.due_date as payableDueDate,
+        pp.payment_ref as payableRef,
         (SELECT COUNT(*) FROM purchase_invoice_items pii WHERE pii.purchase_invoice_id = pi.id) as itemsCount,
         (
           SELECT COALESCE(SUM(pii.quantity), 0)
@@ -49,6 +66,7 @@ function listPurchaseInvoices(opts: { q?: string; limit?: number } = {}): Purcha
           WHERE pii.purchase_invoice_id = pi.id
         ) as totalAmount
       FROM purchase_invoices pi
+      LEFT JOIN payables pp ON pp.purchase_invoice_id = pi.id
       ${q ? "WHERE COALESCE(pi.supplier_name, '') LIKE ? OR COALESCE(pi.number, '') LIKE ?" : ""}
       ORDER BY pi.created_at DESC
       LIMIT ?
@@ -160,6 +178,7 @@ export default async function ComprasPage(props: { searchParams?: Promise<{ q?: 
               <th className="px-4 py-3">Fornecedor</th>
               <th className="px-4 py-3">Nº</th>
               <th className="px-4 py-3">Emissão</th>
+              <th className="px-4 py-3">Financeiro</th>
               <th className="px-4 py-3">Itens</th>
               <th className="px-4 py-3">Qtd total</th>
               <th className="px-4 py-3">Valor</th>
@@ -170,18 +189,27 @@ export default async function ComprasPage(props: { searchParams?: Promise<{ q?: 
               const items = itemsByInvoice.get(r.id) ?? [];
               const avgCost = items.length > 0 ? Number(r.totalAmount ?? 0) / Math.max(Number(r.totalQty ?? 0), 1) : 0;
               return (
-                <>
-                  <tr key={r.id} className="border-t">
+                <Fragment key={r.id}>
+                  <tr className="border-t">
                     <td className="px-4 py-3">{formatDateTime(r.createdAt)}</td>
                     <td className="px-4 py-3 font-semibold">{r.supplierName ?? "-"}</td>
                     <td className="px-4 py-3">{r.number ?? "-"}</td>
                     <td className="px-4 py-3">{formatDate(r.issuedAt)}</td>
+                    <td className="px-4 py-3">
+                      <div className="text-xs">
+                        <div className="font-semibold">{getPayableLabel(r.payableStatus)}</div>
+                        <div className="text-[var(--muted)]">
+                          {r.payableMethod ?? "-"} · {formatDate(r.payableDueDate)}
+                        </div>
+                        {r.payableRef ? <div className="truncate text-[var(--muted)]">{r.payableRef}</div> : null}
+                      </div>
+                    </td>
                     <td className="px-4 py-3">{r.itemsCount}</td>
                     <td className="px-4 py-3 font-semibold">{Number(r.totalQty).toFixed(3)}</td>
                     <td className="px-4 py-3 font-semibold">{money.format(Number(r.totalAmount ?? 0))}</td>
                   </tr>
-                  <tr key={`${r.id}-items`} className="border-t bg-black/[0.015]">
-                    <td className="px-4 py-4" colSpan={7}>
+                  <tr className="border-t bg-black/[0.015]">
+                    <td className="px-4 py-4" colSpan={8}>
                       <div className="flex items-center justify-between">
                         <div className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">
                           Itens da nota
@@ -228,12 +256,12 @@ export default async function ComprasPage(props: { searchParams?: Promise<{ q?: 
                       </div>
                     </td>
                   </tr>
-                </>
+                </Fragment>
               );
             })}
             {invoices.length === 0 ? (
               <tr>
-                <td className="px-4 py-8 text-[var(--muted)]" colSpan={7}>
+                <td className="px-4 py-8 text-[var(--muted)]" colSpan={8}>
                   Nenhuma nota de compra lançada ainda.
                 </td>
               </tr>

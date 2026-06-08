@@ -1,4 +1,5 @@
 import { getDb } from "@/lib/db";
+import { getSaoPauloDateIso } from "@/lib/datetime";
 import { OrderItemsClient, type ProductOpt } from "./order-items-client";
 import { CustomerSelectClient, type CustomerOpt } from "./customer-select-client";
 import { EmitInvoiceSubmitClient } from "./emit-invoice-submit-client";
@@ -34,6 +35,11 @@ function getOptions() {
 export default function NovoPedidoPage() {
   const { customers, products } = getOptions();
   const formId = "new-order-form";
+  const boletoDueDate = (() => {
+    const base = new Date(`${getSaoPauloDateIso()}T12:00:00Z`);
+    base.setUTCDate(base.getUTCDate() + 7);
+    return base.toISOString().slice(0, 10);
+  })();
   return (
     <div className="mx-auto max-w-6xl px-6 py-6">
       <h1 className="text-2xl font-semibold">Novo pedido</h1>
@@ -42,10 +48,31 @@ export default function NovoPedidoPage() {
       </div>
 
       <form id={formId} className="mt-6 space-y-4 rounded-2xl border bg-[var(--card)] p-5">
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           <label className="space-y-1">
             <div className="text-sm font-semibold">Cliente</div>
             <CustomerSelectClient customers={customers} inputName="customerId" />
+          </label>
+          <label className="space-y-1">
+            <div className="text-sm font-semibold">Recebimento</div>
+            <select
+              name="paymentMethod"
+              defaultValue="PIX"
+              className="w-full rounded-xl border bg-[var(--card)] px-4 py-3 text-sm"
+            >
+              <option value="PIX">Pix</option>
+              <option value="CASH">Dinheiro</option>
+              <option value="BOLETO">Boleto</option>
+            </select>
+          </label>
+          <label className="space-y-1">
+            <div className="text-sm font-semibold">Vencimento do boleto</div>
+            <input
+              name="dueDate"
+              type="date"
+              defaultValue={boletoDueDate}
+              className="w-full rounded-xl border bg-[var(--card)] px-4 py-3 text-sm"
+            />
           </label>
           <label className="space-y-1">
             <div className="text-sm font-semibold">Observações</div>

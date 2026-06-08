@@ -5,6 +5,7 @@ import { PrintButtons, PrintOnLoad } from "./print-client";
 import { ensureCustomerSchema } from "@/lib/customer-schema";
 import { getDb } from "@/lib/db";
 import { formatDateTime } from "@/lib/datetime";
+import { ensureOrderPaymentSchema, getOrderPaymentMethodLabel } from "@/lib/payments";
 
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -26,6 +27,7 @@ type PrintableOrder = {
   customerCode: string | null;
   customerCnpj: string | null;
   customerSeller: string | null;
+  paymentMethod: string | null;
   customerStreet: string | null;
   customerNumber: string | null;
   customerComplement: string | null;
@@ -55,6 +57,7 @@ function formatCustomerAddress(order: PrintableOrder) {
 function getOrderPrintable(orderId: number) {
   const db = getDb();
   ensureCustomerSchema(db);
+  ensureOrderPaymentSchema(db);
   const order = db
     .prepare(
       `
@@ -67,6 +70,7 @@ function getOrderPrintable(orderId: number) {
         c.code as customerCode,
         c.cnpj as customerCnpj,
         c.seller as customerSeller,
+        o.payment_method as paymentMethod,
         c.street as customerStreet,
         c.number as customerNumber,
         c.complement as customerComplement,
@@ -134,7 +138,7 @@ function OrderPrintCopy({ order, items, total, created, customerAddress }: Order
           ) : null}
           {order.customerCnpj ? <div className="text-[11px] text-black/70">{order.customerCnpj}</div> : null}
         </div>
-        <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] leading-tight">
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] leading-tight">
           <div>
             <div className="text-[10px] font-semibold uppercase tracking-wide text-black/60">Código</div>
             <div className="font-medium">{order.customerCode || "-"}</div>
@@ -142,6 +146,10 @@ function OrderPrintCopy({ order, items, total, created, customerAddress }: Order
           <div>
             <div className="text-[10px] font-semibold uppercase tracking-wide text-black/60">Vendedor</div>
             <div className="truncate font-medium">{order.customerSeller || "-"}</div>
+          </div>
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-black/60">Pagamento</div>
+            <div className="truncate font-medium">{getOrderPaymentMethodLabel(order.paymentMethod)}</div>
           </div>
           <div className="col-span-2">
             <div className="text-[10px] font-semibold uppercase tracking-wide text-black/60">Endereço</div>

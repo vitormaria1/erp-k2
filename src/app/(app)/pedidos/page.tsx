@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { parseAppDate } from "@/lib/datetime";
 import { formatDateTime, getSaoPauloDateIso, getSaoPauloYearMonth } from "@/lib/datetime";
+import { ensureOrderPaymentSchema, getOrderPaymentMethodLabel } from "@/lib/payments";
 import { getFiscalDbPool } from "@/fiscal/infra/pg";
 import { getConfiguredFocusAmbiente } from "@/fiscal/providers/focus";
 
@@ -18,6 +19,7 @@ type Row = {
   notes: string | null;
   itemsCount: number;
   totalAmount: number;
+  paymentMethod: string;
   customerAddressOk: boolean;
   fiscal: FiscalInvoiceSummary | null;
   fiscalAvailable: boolean;
@@ -58,11 +60,12 @@ function normalizeLegacyOrderStatuses() {
         WHEN status = 'CONFIRMED' THEN 'SEPARADO'
         WHEN status = 'IN_PRODUCTION' THEN 'SEPARADO'
         WHEN status = 'READY' THEN 'ENVIADO'
+        WHEN status = 'PAGO' THEN 'ENTREGUE'
         WHEN status = 'CANCELED' THEN 'FEITO'
         ELSE status
       END,
       updated_at = datetime('now')
-    WHERE status IN ('PENDING', 'CONFIRMED', 'IN_PRODUCTION', 'READY', 'CANCELED')
+    WHERE status IN ('PENDING', 'CONFIRMED', 'IN_PRODUCTION', 'READY', 'PAGO', 'CANCELED')
   `
   ).run();
 }
@@ -71,6 +74,7 @@ async function listOrders(filters: QueryFilters, limit = 200): Promise<Row[]> {
   normalizeLegacyOrderStatuses();
 
   const db = getDb();
+  ensureOrderPaymentSchema(db);
   const where: string[] = [];
   const params: Array<string | number> = [];
 
@@ -86,6 +90,7 @@ async function listOrders(filters: QueryFilters, limit = 200): Promise<Row[]> {
       o.status as status,
       c.name as customerName,
       o.notes as notes,
+      o.payment_method as paymentMethod,
       c.street as customerStreet,
       c.number as customerNumber,
       c.neighborhood as customerNeighborhood,
@@ -111,6 +116,7 @@ async function listOrders(filters: QueryFilters, limit = 200): Promise<Row[]> {
     status: string;
     customerName: string;
     notes: string | null;
+    paymentMethod: string;
     customerStreet: string | null;
     customerNumber: string | null;
     customerNeighborhood: string | null;
@@ -133,6 +139,7 @@ async function listOrders(filters: QueryFilters, limit = 200): Promise<Row[]> {
     notes: row.notes,
     itemsCount: row.itemsCount,
     totalAmount: Number(row.totalAmount ?? 0),
+    paymentMethod: row.paymentMethod,
     customerAddressOk:
       !!row.customerStreet &&
       !!row.customerNumber &&
@@ -319,7 +326,7 @@ function hasActiveFiscalInvoice(fiscal: FiscalInvoiceSummary | null) {
 
 function summarizeOrders(orders: Row[]) {
   const totalValue = orders.reduce((sum, order) => sum + order.totalAmount, 0);
-  const paidCount = orders.filter((order) => order.status === "PAGO").length;
+  const sentCount = orders.filter((order) => order.status === "ENVIADO").length;
   const deliveredCount = orders.filter((order) => order.status === "ENTREGUE").length;
 
   const statusBars = ORDER_STATUS_VALUES.map((status) => {
@@ -353,7 +360,7 @@ function summarizeOrders(orders: Row[]) {
 
   return {
     totalValue,
-    paidCount,
+    sentCount,
     deliveredCount,
     statusBars,
     fiscalBars,
@@ -515,7 +522,7 @@ export default async function PedidosPage(props: {
       <section className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
         <StatCard label="Pedidos filtrados" value={String(orders.length)} sub="Resultado atual da busca" />
         <StatCard label="Valor total" value={money.format(summary.totalValue)} sub="Soma dos pedidos listados" />
-        <StatCard label="Pedidos pagos" value={String(summary.paidCount)} sub="Status operacional pago" />
+        <StatCard label="Pedidos enviados" value={String(summary.sentCount)} sub="Em rota ou a caminho" />
         <StatCard label="Pedidos entregues" value={String(summary.deliveredCount)} sub="Prontos no ciclo logistico" />
       </section>
 
@@ -582,6 +589,7 @@ export default async function PedidosPage(props: {
               <th className="px-4 py-3">Itens</th>
               <th className="px-4 py-3">Valor</th>
               <th className="px-4 py-3">Status</th>
+              <th className="px-4 py-3">Pagamento</th>
               <th className="px-4 py-3">Criado em</th>
               <th className="px-4 py-3">Fiscal</th>
             </tr>
@@ -619,6 +627,7 @@ export default async function PedidosPage(props: {
                     </form>
                   </div>
                 </td>
+                <td className="px-4 py-3">{getOrderPaymentMethodLabel(order.paymentMethod)}</td>
                 <td className="px-4 py-3 text-[var(--muted)]">{formatDateTime(order.createdAt)}</td>
                 <td className="px-4 py-3">
                   <div className="space-y-2">
@@ -677,7 +686,7 @@ export default async function PedidosPage(props: {
             ))}
             {orders.length === 0 ? (
               <tr>
-                <td className="px-4 py-8 text-[var(--muted)]" colSpan={7}>
+                <td className="px-4 py-8 text-[var(--muted)]" colSpan={8}>
                   Nenhum pedido encontrado com os filtros atuais.
                 </td>
               </tr>
