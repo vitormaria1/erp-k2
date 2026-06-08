@@ -3,9 +3,11 @@ import { getDb } from "@/lib/db";
 import { formatDate, formatDateTime, getSaoPauloDateIso, startOfSaoPauloWeekIso } from "@/lib/datetime";
 import { ensureFinancialSchema } from "@/lib/financial-ledger";
 import { getOrderPaymentMethodLabel } from "@/lib/payments";
+import { isFinanceAuthenticated } from "@/lib/simple-auth";
 
 import {
   closeRouteOrderAction,
+  financeLockAction,
   gerarBoletoMockAction,
   settleReceivableAction,
   settlePayableAction,
@@ -14,6 +16,7 @@ import {
   updatePayableStatusAction,
   updateReceivableStatusAction,
 } from "./actions";
+import { FinanceUnlockForm } from "./unlock-form";
 import {
   getOrderStatusMeta,
   isOrderStatus,
@@ -537,6 +540,10 @@ function StatCard(props: { label: string; value: string; sub: string }) {
 export default async function FinanceiroPage(props: {
   searchParams?: Promise<{ loadingId?: string; from?: string; to?: string; preset?: string }>;
 }) {
+  if (!(await isFinanceAuthenticated())) {
+    return <FinanceUnlockForm />;
+  }
+
   const sp = (await props.searchParams) ?? {};
   const loadingId = sp.loadingId?.trim() ?? "";
   const cashPeriod = resolveCashPeriod(sp);
@@ -936,6 +943,9 @@ export default async function FinanceiroPage(props: {
           <h2 className="text-base font-semibold">Contas a receber</h2>
           <div className="text-sm text-[var(--muted)]">Baixas de clientes e status financeiro dos pedidos faturados.</div>
         </div>
+        <form action={financeLockAction} className="mb-3">
+          <button className="rounded-xl border px-4 py-2 text-xs font-semibold">Bloquear financeiro</button>
+        </form>
         <div className="overflow-x-auto rounded-2xl border bg-[var(--card)] shadow-sm">
           <table className="w-full min-w-[1500px] text-sm">
             <thead className="bg-black/[0.02] text-left text-[var(--muted)]">

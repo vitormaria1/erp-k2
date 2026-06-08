@@ -18,9 +18,20 @@ import {
   startRouteClosure,
   updateOrderStatusWithFinancialSync,
 } from "@/lib/order-finance-sync";
-import { isAuthenticated } from "@/lib/simple-auth";
+import {
+  SIMPLE_FINANCE_PIN,
+  createFinanceSession,
+  clearFinanceSession,
+  isAuthenticated,
+  isFinanceAuthenticated,
+} from "@/lib/simple-auth";
 
 import { ORDER_STATUS_VALUES } from "../pedidos/status";
+
+export type FinanceUnlockState = {
+  error: string | null;
+  unlocked: boolean;
+};
 
 const receivableSchema = z.object({ receivableId: z.string().min(1) });
 const receivableStatusSchema = z.object({
@@ -61,6 +72,10 @@ const routeStartSchema = z.object({
   loadingId: z.string().min(1),
 });
 
+const financePinSchema = z.object({
+  pin: z.string().trim().regex(/^\d{4}$/),
+});
+
 function fakeLinhaDigitavel() {
   return Array.from({ length: 47 }, () => Math.floor(Math.random() * 10)).join("");
 }
@@ -71,10 +86,43 @@ function revalidateFinanceViews() {
   revalidatePath("/compras");
 }
 
-export async function gerarBoletoMockAction(formData: FormData) {
+async function ensureFinanceAuthorized() {
   if (!(await isAuthenticated())) {
     throw new Error("Unauthorized");
   }
+  if (!(await isFinanceAuthenticated())) {
+    throw new Error("FinanceUnauthorized");
+  }
+}
+
+export async function financeUnlockAction(
+  _prevState: FinanceUnlockState,
+  formData: FormData
+): Promise<FinanceUnlockState> {
+  if (!(await isAuthenticated())) {
+    return { error: "Sessao expirada. Entre novamente.", unlocked: false };
+  }
+
+  const { pin } = financePinSchema.parse({
+    pin: formData.get("pin"),
+  });
+
+  if (pin !== SIMPLE_FINANCE_PIN) {
+    return { error: "PIN invalido.", unlocked: false };
+  }
+
+  await createFinanceSession();
+  revalidatePath("/financeiro");
+  return { error: null, unlocked: true };
+}
+
+export async function financeLockAction() {
+  await clearFinanceSession();
+  revalidatePath("/financeiro");
+}
+
+export async function gerarBoletoMockAction(formData: FormData) {
+  await ensureFinanceAuthorized();
 
   const { receivableId } = receivableSchema.parse({ receivableId: formData.get("receivableId") });
   const db = getDb();
@@ -121,9 +169,7 @@ export async function gerarBoletoMockAction(formData: FormData) {
 }
 
 export async function updateReceivableStatusAction(receivableId: string, formData: FormData) {
-  if (!(await isAuthenticated())) {
-    throw new Error("Unauthorized");
-  }
+  await ensureFinanceAuthorized();
 
   const { status, effectiveDate, method, dueDate } = receivableStatusSchema.parse({
     status: formData.get("status"),
@@ -146,9 +192,7 @@ export async function updateReceivableStatusAction(receivableId: string, formDat
 }
 
 export async function settleReceivableAction(formData: FormData) {
-  if (!(await isAuthenticated())) {
-    throw new Error("Unauthorized");
-  }
+  await ensureFinanceAuthorized();
 
   const { receivableId, effectiveDate, method, dueDate } = receivableSettlementSchema.parse({
     receivableId: formData.get("receivableId"),
@@ -164,9 +208,7 @@ export async function settleReceivableAction(formData: FormData) {
 }
 
 export async function updatePayableStatusAction(payableId: string, formData: FormData) {
-  if (!(await isAuthenticated())) {
-    throw new Error("Unauthorized");
-  }
+  await ensureFinanceAuthorized();
 
   const { status, effectiveDate } = payableStatusSchema.parse({
     status: formData.get("status"),
@@ -186,9 +228,7 @@ export async function updatePayableStatusAction(payableId: string, formData: For
 }
 
 export async function settlePayableAction(formData: FormData) {
-  if (!(await isAuthenticated())) {
-    throw new Error("Unauthorized");
-  }
+  await ensureFinanceAuthorized();
 
   const { payableId, effectiveDate } = payablePaymentSchema.parse({
     payableId: formData.get("payableId"),
@@ -201,9 +241,7 @@ export async function settlePayableAction(formData: FormData) {
 }
 
 export async function updateFinanceOrderStatusAction(orderId: number, formData: FormData) {
-  if (!(await isAuthenticated())) {
-    throw new Error("Unauthorized");
-  }
+  await ensureFinanceAuthorized();
 
   const { status } = orderStatusSchema.parse({
     status: formData.get("status"),
@@ -215,9 +253,7 @@ export async function updateFinanceOrderStatusAction(orderId: number, formData: 
 }
 
 export async function closeRouteOrderAction(formData: FormData) {
-  if (!(await isAuthenticated())) {
-    throw new Error("Unauthorized");
-  }
+  await ensureFinanceAuthorized();
 
   const { orderId, mode } = routeCloseSchema.parse({
     orderId: formData.get("orderId"),
@@ -231,9 +267,7 @@ export async function closeRouteOrderAction(formData: FormData) {
 }
 
 export async function startRouteClosureAction(formData: FormData) {
-  if (!(await isAuthenticated())) {
-    throw new Error("Unauthorized");
-  }
+  await ensureFinanceAuthorized();
 
   const { loadingId } = routeStartSchema.parse({
     loadingId: formData.get("loadingId"),
