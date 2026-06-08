@@ -744,6 +744,7 @@ export default async function FinanceiroPage(props: {
             </div>
           </div>
           <form action="/financeiro" method="GET" className="flex flex-col gap-2 lg:flex-row lg:items-end">
+            <input type="hidden" name="setor" value="caixa" />
             {activeLoadingId ? <input type="hidden" name="loadingId" value={activeLoadingId} /> : null}
             <select
               name="preset"
@@ -937,6 +938,7 @@ export default async function FinanceiroPage(props: {
           </div>
           <div className="flex w-full flex-col gap-2 lg:max-w-xl">
             <form action="/financeiro" method="GET" className="flex w-full flex-col gap-2 sm:flex-row">
+              <input type="hidden" name="setor" value="rotas" />
               <input type="hidden" name="preset" value={cashPeriod.preset} />
               <input type="hidden" name="from" value={cashPeriod.from} />
               <input type="hidden" name="to" value={cashPeriod.to} />
