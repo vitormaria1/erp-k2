@@ -1,18 +1,21 @@
 import Link from "next/link";
 
+import { PRODUCT_KIND_VALUES } from "@/lib/catalog-schema";
 import { listStockProducts } from "@/lib/queries";
 import { PRODUCT_STOCK_COLUMNS } from "@/lib/product-columns";
 import { StockTableClient } from "./stock-table-client";
 
-export default async function EstoquePage(props: { searchParams?: Promise<{ q?: string; active?: string }> }) {
+export default async function EstoquePage(props: { searchParams?: Promise<{ q?: string; active?: string; kind?: string }> }) {
   const sp = (await props.searchParams) ?? {};
   const q = sp.q ?? "";
   const active = sp.active ?? "";
+  const kind = sp.kind ?? "";
   const baseRows = listStockProducts({ q });
   const rows = baseRows.filter((row) => {
     const isActive = Boolean(row.active);
     if (active === "yes" && !isActive) return false;
     if (active === "no" && isActive) return false;
+    if (kind && String(row.kind ?? "") !== kind) return false;
     return true;
   });
   const summary = {
@@ -74,6 +77,14 @@ export default async function EstoquePage(props: { searchParams?: Promise<{ q?: 
               <option value="">Cadastro: todos</option>
               <option value="yes">Somente ATIVO</option>
               <option value="no">Somente INATIVO</option>
+            </select>
+            <select name="kind" defaultValue={kind} className="rounded-xl border bg-[var(--card)] px-4 py-3 text-sm">
+              <option value="">Tipo: todos</option>
+              {PRODUCT_KIND_VALUES.map((value) => (
+                <option key={value} value={value}>
+                  {value}
+                </option>
+              ))}
             </select>
             <button className="rounded-xl bg-black px-4 py-3 text-sm font-semibold text-white">
               Buscar

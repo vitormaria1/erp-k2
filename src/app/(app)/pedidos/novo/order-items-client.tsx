@@ -193,7 +193,7 @@ export function OrderItemsClient({ products, formId }: { products: ProductOpt[];
             <div>
               <div className="text-sm font-semibold">Produtos</div>
               <div className="text-xs text-[var(--muted)]">
-                Digite por nome, c&oacute;digo ou refer&ecirc;ncia. A lista filtra a cada letra.
+                Digite por nome, c&oacute;digo ou refer&ecirc;ncia. Apenas itens do tipo PRODUTO aparecem aqui.
               </div>
             </div>
             <div className="text-xs text-[var(--muted)]">{filteredProducts.length} itens</div>

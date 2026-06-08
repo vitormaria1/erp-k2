@@ -7,7 +7,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { applyStockMovement } from "@/lib/inventory";
-import { ensureProductSchema } from "@/lib/catalog-schema";
+import { ensureProductSchema, PRODUCT_KIND_VALUES } from "@/lib/catalog-schema";
 import { getDb } from "@/lib/db";
 import { PRODUCT_EDITABLE_FIELDS } from "@/lib/product-columns";
 
@@ -47,6 +47,8 @@ function numberValue(formData: FormData, field: string, fallback: number | null 
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+const productKindSchema = z.enum(PRODUCT_KIND_VALUES);
+
 export async function saveProductAction(formData: FormData) {
   const db = getDb();
   ensureProductSchema(db);
@@ -54,7 +56,7 @@ export async function saveProductAction(formData: FormData) {
   const reference = textValue(formData, "reference");
   const description = textValue(formData, "description");
   const unit = textValue(formData, "unit") ?? "UN";
-  const kind = textValue(formData, "kind") ?? "UNKNOWN";
+  const kind = productKindSchema.parse(String(formData.get("kind") ?? "PRODUTO").trim().toUpperCase());
 
   if (!reference) throw new Error("Informe a referência.");
   if (!description) throw new Error("Informe a descrição.");

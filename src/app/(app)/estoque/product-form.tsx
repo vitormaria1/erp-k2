@@ -6,6 +6,7 @@ import {
   PRODUCT_FORM_SECTIONS,
   type ProductFieldGroup,
 } from "@/lib/product-columns";
+import { PRODUCT_KIND_VALUES } from "@/lib/catalog-schema";
 import type { ProductRecord } from "@/lib/queries";
 
 function inputId(field: string) {
@@ -48,7 +49,20 @@ function FieldInput({
   return (
     <label className="flex flex-col gap-1 text-sm">
       <span className="font-medium text-[var(--muted)]">{label}</span>
-      {isTextareaField(field) ? (
+      {field === "kind" ? (
+        <select
+          id={id}
+          name={field}
+          defaultValue={value || "PRODUTO"}
+          className="rounded-xl border bg-[var(--card)] px-3 py-2 text-sm outline-none"
+        >
+          {PRODUCT_KIND_VALUES.map((kind) => (
+            <option key={kind} value={kind}>
+              {kind}
+            </option>
+          ))}
+        </select>
+      ) : isTextareaField(field) ? (
         <textarea
           id={id}
           name={field}
@@ -115,6 +129,7 @@ export function ProductForm({
 
       <section className="rounded-2xl border bg-[var(--card)] p-4 shadow-sm">
         <h2 className="mb-4 text-lg font-semibold">Status do cadastro</h2>
+        <div className="grid gap-4 md:grid-cols-2">
         <label className="flex max-w-xs flex-col gap-1 text-sm">
           <span className="font-medium text-[var(--muted)]">Status</span>
           <select
@@ -126,6 +141,21 @@ export function ProductForm({
             <option value="0">INATIVO</option>
           </select>
         </label>
+        <label className="flex max-w-xs flex-col gap-1 text-sm">
+          <span className="font-medium text-[var(--muted)]">Tipo</span>
+          <select
+            name="kind"
+            defaultValue={String(product?.kind ?? "PRODUTO") || "PRODUTO"}
+            className="rounded-xl border bg-[var(--card)] px-3 py-2 text-sm outline-none"
+          >
+            {PRODUCT_KIND_VALUES.map((kind) => (
+              <option key={kind} value={kind}>
+                {kind}
+              </option>
+            ))}
+          </select>
+        </label>
+        </div>
       </section>
 
       {product ? (

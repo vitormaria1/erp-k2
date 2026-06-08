@@ -25,11 +25,11 @@ function getOptions() {
 
   try {
     products = db
-      .prepare('SELECT id, description, reference, unit, price, "Preco Venda" as salePriceRaw FROM products WHERE active = TRUE ORDER BY description')
+      .prepare("SELECT id, description, reference, unit, price, \"Preco Venda\" as salePriceRaw FROM products WHERE active = TRUE AND kind = 'PRODUTO' ORDER BY description")
       .all() as ProductOpt[];
   } catch {
     products = db
-      .prepare("SELECT id, description, id as reference, 'UN' as unit, NULL as price, NULL as salePriceRaw FROM products WHERE active = TRUE ORDER BY description")
+      .prepare("SELECT id, description, id as reference, 'UN' as unit, NULL as price, NULL as salePriceRaw FROM products WHERE active = TRUE AND kind = 'PRODUTO' ORDER BY description")
       .all() as ProductOpt[];
   }
 

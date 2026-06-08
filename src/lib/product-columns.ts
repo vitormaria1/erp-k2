@@ -55,7 +55,7 @@ export const PRODUCT_FORM_FIELDS = [
 export const PRODUCT_FORM_SECTIONS: ProductFieldGroup[] = [
   {
     label: "Campos principais",
-    fields: ["reference", "tele_ref", "barcode", "gtin", "description", "composition", "unit", "kind", "price", "cost", "min_stock", "stock_qty"],
+    fields: ["reference", "tele_ref", "barcode", "gtin", "description", "composition", "unit", "price", "cost", "min_stock", "stock_qty"],
   },
   {
     label: "Cadastro básico do PDF",
