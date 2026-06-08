@@ -30,7 +30,7 @@ function productDefaultPrice(product: ProductOpt) {
   return asPrice(product.price) ?? asPrice(product.salePriceRaw);
 }
 
-export function OrderItemsClient({ products }: { products: ProductOpt[] }) {
+export function OrderItemsClient({ products, formId }: { products: ProductOpt[]; formId: string }) {
   const [items, setItems] = React.useState<DraftItem[]>([]);
   const [productId, setProductId] = React.useState("");
   const [productQuery, setProductQuery] = React.useState("");
@@ -97,6 +97,22 @@ export function OrderItemsClient({ products }: { products: ProductOpt[] }) {
       })
     );
   }
+
+  React.useEffect(() => {
+    const form = document.getElementById(formId);
+    if (!(form instanceof HTMLFormElement)) return;
+
+    const handleReset = () => {
+      setItems([]);
+      setProductId("");
+      setProductQuery("");
+      setQuantity("1");
+      setUnitPrice("");
+    };
+
+    form.addEventListener("reset", handleReset);
+    return () => form.removeEventListener("reset", handleReset);
+  }, [formId]);
 
   return (
     <div className="mt-3 space-y-3">

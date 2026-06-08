@@ -4,10 +4,9 @@ import { z } from "zod";
 
 import { getDb } from "@/lib/db";
 import {
+  buildReceivableInstallments,
   ensureOrderPaymentSchema,
-  getDefaultReceivableDueDate,
   ORDER_PAYMENT_METHOD_VALUES,
-  type OrderPaymentMethod,
 } from "@/lib/payments";
 
 export const itemSchema = z.object({
@@ -22,6 +21,7 @@ export const createSchema = z.object({
   itemsJson: z.string().min(2),
   paymentMethod: z.enum(ORDER_PAYMENT_METHOD_VALUES),
   dueDate: z.string().optional(),
+  installments: z.coerce.number().int().min(1).max(12).default(1),
 });
 
 export function parseCreateOrderFormData(formData: FormData) {
@@ -31,6 +31,7 @@ export function parseCreateOrderFormData(formData: FormData) {
     itemsJson: formData.get("itemsJson")?.toString(),
     paymentMethod: formData.get("paymentMethod"),
     dueDate: formData.get("dueDate")?.toString(),
+    installments: formData.get("installments"),
   });
 
   const items = z.array(itemSchema).parse(JSON.parse(parsed.itemsJson));
@@ -95,10 +96,25 @@ export function createOrder(input: ReturnType<typeof parseCreateOrderFormData>) 
 
     const amount = input.items.reduce((acc, it) => acc + (it.unitPrice ?? 0) * it.quantity, 0);
     if (amount > 0) {
-      const dueDate = getDefaultReceivableDueDate(input.paymentMethod as OrderPaymentMethod, input.dueDate);
-      db.prepare(
+      const installments = buildReceivableInstallments({
+        method: input.paymentMethod,
+        totalAmount: amount,
+        dueDate: input.dueDate,
+        installments: input.installments,
+      });
+      const insertReceivable = db.prepare(
         "INSERT INTO receivables (id, customer_id, order_id, status, method, amount, due_date) VALUES (?, ?, ?, 'OPEN', ?, ?, ?)"
-      ).run(randomUUID(), input.customerId, orderId, input.paymentMethod, amount, dueDate);
+      );
+      for (const installment of installments) {
+        insertReceivable.run(
+          randomUUID(),
+          input.customerId,
+          orderId,
+          input.paymentMethod,
+          installment.amount,
+          installment.dueDateIso
+        );
+      }
     }
 
     return orderId;

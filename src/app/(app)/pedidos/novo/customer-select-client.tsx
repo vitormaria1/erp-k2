@@ -17,9 +17,11 @@ function normalize(text: string) {
 export function CustomerSelectClient({
   customers,
   inputName = "customerId",
+  formId,
 }: {
   customers: CustomerOpt[];
   inputName?: string;
+  formId: string;
 }) {
   const [query, setQuery] = React.useState("");
   const [open, setOpen] = React.useState(false);
@@ -49,6 +51,20 @@ export function CustomerSelectClient({
     setQuery(`${c.name}${c.tradeName ? ` (${c.tradeName})` : ""}`);
     setOpen(false);
   }
+
+  React.useEffect(() => {
+    const form = document.getElementById(formId);
+    if (!(form instanceof HTMLFormElement)) return;
+
+    const handleReset = () => {
+      setQuery("");
+      setOpen(false);
+      setSelectedId("");
+    };
+
+    form.addEventListener("reset", handleReset);
+    return () => form.removeEventListener("reset", handleReset);
+  }, [formId]);
 
   return (
     <div className="relative">
@@ -112,4 +128,3 @@ export function CustomerSelectClient({
     </div>
   );
 }
-

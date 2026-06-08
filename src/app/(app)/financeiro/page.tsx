@@ -78,6 +78,7 @@ type RouteCloseRow = {
   orderStatus: string;
   receivableId: string | null;
   receivableStatus: string | null;
+  receivablesCount: number;
   amount: number | null;
   dueDate: string | null;
   paidAt: string | null;
@@ -283,21 +284,47 @@ function listRouteCloseRows(loadingId: string): RouteCloseRow[] {
         o.id as orderId,
         c.name as customerName,
         o.status as orderStatus,
-        r.id as receivableId,
-        r.status as receivableStatus,
-        r.amount as amount,
-        r.due_date as dueDate,
-        r.paid_at as paidAt
+        (
+          SELECT r2.id
+          FROM receivables r2
+          WHERE r2.order_id = o.id
+          ORDER BY r2.created_at DESC
+          LIMIT 1
+        ) as receivableId,
+        (
+          SELECT COUNT(*)
+          FROM receivables r2
+          WHERE r2.order_id = o.id
+        ) as receivablesCount,
+        (
+          SELECT
+            CASE
+              WHEN COUNT(*) = 0 THEN NULL
+              WHEN COUNT(*) FILTER (WHERE status = 'PAID') = COUNT(*) THEN 'PAID'
+              WHEN COUNT(*) FILTER (WHERE status = 'CANCELED') = COUNT(*) THEN 'CANCELED'
+              ELSE 'OPEN'
+            END
+          FROM receivables r2
+          WHERE r2.order_id = o.id
+        ) as receivableStatus,
+        (
+          SELECT COALESCE(SUM(r2.amount), 0)
+          FROM receivables r2
+          WHERE r2.order_id = o.id AND r2.status <> 'CANCELED'
+        ) as amount,
+        (
+          SELECT MIN(r2.due_date)
+          FROM receivables r2
+          WHERE r2.order_id = o.id AND r2.status <> 'CANCELED'
+        ) as dueDate,
+        (
+          SELECT MAX(r2.paid_at)
+          FROM receivables r2
+          WHERE r2.order_id = o.id
+        ) as paidAt
       FROM loading_orders lo
       JOIN orders o ON o.id = lo.order_id
       JOIN customers c ON c.id = o.customer_id
-      LEFT JOIN receivables r ON r.id = (
-        SELECT r2.id
-        FROM receivables r2
-        WHERE r2.order_id = o.id
-        ORDER BY r2.created_at DESC
-        LIMIT 1
-      )
       WHERE lo.loading_id = ?
       ORDER BY c.name ASC, o.id ASC
     `
@@ -841,7 +868,7 @@ export default async function FinanceiroPage(props: {
                         </td>
                         <td className="px-4 py-3">
                           {row.receivableId ? (
-                            <div>
+                          <div>
                               <span
                                 className={[
                                   "inline-flex rounded-full px-3 py-1 text-xs font-semibold",
@@ -851,7 +878,8 @@ export default async function FinanceiroPage(props: {
                                 {getPaymentMeta(row.receivableStatus ?? "OPEN").label}
                               </span>
                               <div className="text-xs text-[var(--muted)]">
-                                {row.paidAt ? `Pago em ${formatDate(row.paidAt)}` : "Sem baixa"}
+                                {row.receivablesCount > 1 ? `${row.receivablesCount} parcelas` : "1 parcela"}
+                                {row.paidAt ? ` · Pago em ${formatDate(row.paidAt)}` : " · Sem baixa"}
                               </div>
                             </div>
                           ) : (

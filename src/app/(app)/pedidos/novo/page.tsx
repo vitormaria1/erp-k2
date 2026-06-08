@@ -1,8 +1,8 @@
 import { getDb } from "@/lib/db";
-import { getSaoPauloDateIso } from "@/lib/datetime";
 import { OrderItemsClient, type ProductOpt } from "./order-items-client";
 import { CustomerSelectClient, type CustomerOpt } from "./customer-select-client";
 import { EmitInvoiceSubmitClient } from "./emit-invoice-submit-client";
+import { PaymentFieldsClient } from "./payment-fields-client";
 
 function getOptions() {
   const db = getDb();
@@ -35,11 +35,6 @@ function getOptions() {
 export default function NovoPedidoPage() {
   const { customers, products } = getOptions();
   const formId = "new-order-form";
-  const boletoDueDate = (() => {
-    const base = new Date(`${getSaoPauloDateIso()}T12:00:00Z`);
-    base.setUTCDate(base.getUTCDate() + 7);
-    return base.toISOString().slice(0, 10);
-  })();
   return (
     <div className="mx-auto max-w-6xl px-6 py-6">
       <h1 className="text-2xl font-semibold">Novo pedido</h1>
@@ -51,29 +46,9 @@ export default function NovoPedidoPage() {
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
           <label className="space-y-1">
             <div className="text-sm font-semibold">Cliente</div>
-            <CustomerSelectClient customers={customers} inputName="customerId" />
+            <CustomerSelectClient customers={customers} inputName="customerId" formId={formId} />
           </label>
-          <label className="space-y-1">
-            <div className="text-sm font-semibold">Recebimento</div>
-            <select
-              name="paymentMethod"
-              defaultValue="PIX"
-              className="w-full rounded-xl border bg-[var(--card)] px-4 py-3 text-sm"
-            >
-              <option value="PIX">Pix</option>
-              <option value="CASH">Dinheiro</option>
-              <option value="BOLETO">Boleto</option>
-            </select>
-          </label>
-          <label className="space-y-1">
-            <div className="text-sm font-semibold">Vencimento do boleto</div>
-            <input
-              name="dueDate"
-              type="date"
-              defaultValue={boletoDueDate}
-              className="w-full rounded-xl border bg-[var(--card)] px-4 py-3 text-sm"
-            />
-          </label>
+          <PaymentFieldsClient formId={formId} />
           <label className="space-y-1">
             <div className="text-sm font-semibold">Observações</div>
             <input
@@ -89,7 +64,7 @@ export default function NovoPedidoPage() {
           <div className="mt-2 text-sm text-[var(--muted)]">
             Os produtos ficam carregados em uma lista compacta com rolagem e busca imediata.
           </div>
-          <OrderItemsClient products={products} />
+          <OrderItemsClient products={products} formId={formId} />
         </div>
 
         <EmitInvoiceSubmitClient formId={formId} />

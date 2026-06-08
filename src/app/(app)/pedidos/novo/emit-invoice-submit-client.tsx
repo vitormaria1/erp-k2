@@ -34,6 +34,10 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function resetOrderForm(form: HTMLFormElement) {
+  form.reset();
+}
+
 export function EmitInvoiceSubmitClient({ formId }: Props) {
   const [isPending, startTransition] = useTransition();
   const [notice, setNotice] = useState<{
@@ -208,6 +212,7 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
         }
 
         if (res.ok) {
+          resetOrderForm(form);
           setNotice({
             tone: "success",
             text: `Pedido #${payload.orderId ?? "-"} criado. A NF está sendo processada.`,
@@ -288,6 +293,8 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
         } else {
           window.open(payload.orderPrintUrl, "_blank", "noopener,noreferrer");
         }
+
+        resetOrderForm(form);
 
         setNotice({
           tone: "success",

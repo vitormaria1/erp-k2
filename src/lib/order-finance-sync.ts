@@ -6,7 +6,7 @@ export type SyncedOrderStatus = "FEITO" | "SEPARADO" | "ENVIADO" | "ENTREGUE";
 
 type DbLike = ReturnType<typeof getDb>;
 
-function getLatestReceivableByOrderId(db: DbLike, orderId: number) {
+function listReceivablesByOrderId(db: DbLike, orderId: number) {
   return db
     .prepare(
       `
@@ -14,10 +14,9 @@ function getLatestReceivableByOrderId(db: DbLike, orderId: number) {
       FROM receivables
       WHERE order_id = ?
       ORDER BY created_at DESC
-      LIMIT 1
     `
     )
-    .get(orderId) as { id: string; status: ReceivableStatus } | undefined;
+    .all(orderId) as Array<{ id: string; status: ReceivableStatus }>;
 }
 
 function setOrderStatusOnly(db: DbLike, orderId: number, status: string) {
@@ -46,14 +45,16 @@ export function closeRouteOrder(
 ) {
   setOrderStatusOnly(db, orderId, "ENTREGUE");
 
-  const receivable = getLatestReceivableByOrderId(db, orderId);
-  if (!receivable) return;
+  const receivables = listReceivablesByOrderId(db, orderId);
+  if (receivables.length === 0) return;
 
   ensureFinancialSchema(db);
-  updateReceivableLedgerStatus({
-    db,
-    receivableId: receivable.id,
-    status: mode === "PAID" ? "PAID" : "OPEN",
-    effectiveDate,
-  });
+  for (const receivable of receivables) {
+    updateReceivableLedgerStatus({
+      db,
+      receivableId: receivable.id,
+      status: mode === "PAID" ? "PAID" : "OPEN",
+      effectiveDate,
+    });
+  }
 }
