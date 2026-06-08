@@ -48,6 +48,7 @@ type OrderRow = {
 type ItemRow = {
   itemId: string;
   productId: string;
+  productCode: string | null;
   description: string;
   unit: string;
   quantity: number;
@@ -96,6 +97,7 @@ function loadOrder(orderId: number): { order: OrderRow; items: ItemRow[] } {
       SELECT
         oi.id as itemId,
         oi.product_id as productId,
+        p.reference as productCode,
         p.description as description,
         p.unit as unit,
         oi.quantity as quantity,
@@ -145,6 +147,7 @@ export async function buildFiscalDraftFromOrder(orderId: number) {
     draftItems.push({
       itemId: it.itemId ?? randomUUID(),
       productId: it.productId,
+      productCode: it.productCode ?? it.productId,
       description: it.description,
       ncm: fiscalData.ncm,
       cfop: fiscalData.cfopPadrao,

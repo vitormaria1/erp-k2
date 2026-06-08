@@ -49,7 +49,7 @@ export class FocusNFePayloadBuilder implements FiscalPayloadBuilder<Record<strin
 
         return {
           numero_item: idx + 1,
-          codigo_produto: item.productId,
+          codigo_produto: item.productCode ?? item.productId,
           descricao: item.description,
 
           codigo_ncm: fiscalData.ncm,

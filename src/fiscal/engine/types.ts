@@ -45,6 +45,7 @@ export type Recipient = z.infer<typeof RecipientSchema>;
 export const InvoiceItemDraftSchema = z.object({
   itemId: z.string().uuid(),
   productId: z.string().uuid(),
+  productCode: z.string().trim().min(1).max(60).optional(),
   description: z.string().trim().min(1).max(120),
   ncm: z.string().trim().regex(/^\d{8}$/),
   cfop: z.string().trim().regex(/^\d{4}$/),
