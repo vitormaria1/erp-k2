@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { applyStockMovement } from "@/lib/inventory";
+import { ensureProductSchema } from "@/lib/catalog-schema";
 import { getDb } from "@/lib/db";
 import { PRODUCT_EDITABLE_FIELDS } from "@/lib/product-columns";
 
@@ -48,6 +49,7 @@ function numberValue(formData: FormData, field: string, fallback: number | null 
 
 export async function saveProductAction(formData: FormData) {
   const db = getDb();
+  ensureProductSchema(db);
   const id = textValue(formData, "id") ?? randomUUID();
   const reference = textValue(formData, "reference");
   const description = textValue(formData, "description");
@@ -75,6 +77,7 @@ export async function saveProductAction(formData: FormData) {
     cost: numberValue(formData, "cost"),
     min_stock: numberValue(formData, "min_stock"),
     stock_qty: numberValue(formData, "stock_qty", 0),
+    active: String(formData.get("active") ?? "1") === "0" ? 0 : 1,
   };
 
   for (const field of PRODUCT_EDITABLE_FIELDS) {

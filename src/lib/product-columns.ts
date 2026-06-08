@@ -19,6 +19,7 @@ export const PRODUCT_PDF_HEADERS = productPdfRaw.headers as string[];
 
 export function getProductFieldLabel(field: string): string {
   const labels: Record<string, string> = {
+    active: "Status",
     reference: "Referência",
     tele_ref: "Ref. Tele.",
     barcode: "Código de barras",
@@ -75,6 +76,7 @@ export const PRODUCT_FORM_SECTIONS: ProductFieldGroup[] = [
 ];
 
 const stockColumns: ProductColumnConfig[] = [
+  { key: "active", label: "Status", width: 110, visible: true, kind: "text" },
   { key: "reference", label: "Ref.", width: 120, visible: true, kind: "text" },
   { key: "tele_ref", label: "Tele.Ref.", width: 110, visible: true, kind: "text" },
   { key: "barcode", label: "Barras", width: 160, visible: false, kind: "text" },

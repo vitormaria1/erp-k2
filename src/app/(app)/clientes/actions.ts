@@ -19,6 +19,7 @@ const optionalText = z
 
 const customerSchema = z.object({
   id: z.string().optional(),
+  active: z.enum(["1", "0"]).default("1"),
   code: z.string().trim().min(1, "Informe o código do cliente."),
   cnpj: optionalText,
   stateTaxId: optionalText,
@@ -51,6 +52,7 @@ const customerSchema = z.object({
 function parseCustomerForm(formData: FormData) {
   return customerSchema.parse({
     id: formData.get("id")?.toString(),
+    active: formData.get("active")?.toString() === "0" ? "0" : "1",
     code: formData.get("code")?.toString(),
     cnpj: formData.get("cnpj")?.toString(),
     stateTaxId: formData.get("stateTaxId")?.toString(),
@@ -106,13 +108,13 @@ export async function createCustomerAction(formData: FormData) {
       INSERT INTO customers (
         id, code, cnpj, state_tax_id, taxpayer, name, trade_name, seller, cep,
         street, number, complement, neighborhood, city, uf, city_code,
-        country, country_code, phone, email, home_page, tracks_orders,
+        country, country_code, phone, email, home_page, active, tracks_orders,
         registered_at, last_updated_at, blocked, block_reason, customer_type_code, updated_at
       )
       VALUES (
         @id, @code, @cnpj, @state_tax_id, @taxpayer, @name, @trade_name, @seller, @cep,
         @street, @number, @complement, @neighborhood, @city, @uf, @city_code,
-        @country, @country_code, @phone, @email, @home_page, @tracks_orders,
+        @country, @country_code, @phone, @email, @home_page, @active, @tracks_orders,
         @registered_at, @last_updated_at, @blocked, @block_reason, @customer_type_code, datetime('now')
       )
     `
@@ -138,6 +140,7 @@ export async function createCustomerAction(formData: FormData) {
     phone: parsed.phone,
     email: parsed.email,
     home_page: parsed.homePage,
+    active: parsed.active === "1" ? 1 : 0,
     tracks_orders: parsed.tracksOrders ? 1 : 0,
     registered_at: parsed.registeredAt,
     last_updated_at: parsed.lastUpdatedAt,
@@ -187,6 +190,7 @@ export async function updateCustomerAction(formData: FormData) {
           phone=@phone,
           email=@email,
           home_page=@home_page,
+          active=@active,
           tracks_orders=@tracks_orders,
           registered_at=@registered_at,
           last_updated_at=@last_updated_at,
@@ -219,6 +223,7 @@ export async function updateCustomerAction(formData: FormData) {
       phone: parsed.phone,
       email: parsed.email,
       home_page: parsed.homePage,
+      active: parsed.active === "1" ? 1 : 0,
       tracks_orders: parsed.tracksOrders ? 1 : 0,
       registered_at: parsed.registeredAt,
       last_updated_at: parsed.lastUpdatedAt,

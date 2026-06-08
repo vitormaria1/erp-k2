@@ -113,6 +113,21 @@ export function ProductForm({
 
       {product ? <input type="hidden" name="id" value={String(product.id ?? "")} /> : null}
 
+      <section className="rounded-2xl border bg-[var(--card)] p-4 shadow-sm">
+        <h2 className="mb-4 text-lg font-semibold">Status do cadastro</h2>
+        <label className="flex max-w-xs flex-col gap-1 text-sm">
+          <span className="font-medium text-[var(--muted)]">Status</span>
+          <select
+            name="active"
+            defaultValue={String(product?.active ?? 1) === "0" ? "0" : "1"}
+            className="rounded-xl border bg-[var(--card)] px-3 py-2 text-sm outline-none"
+          >
+            <option value="1">ATIVO</option>
+            <option value="0">INATIVO</option>
+          </select>
+        </label>
+      </section>
+
       {product ? (
         <div className="grid gap-3 rounded-2xl border bg-[var(--card)] p-4 text-sm shadow-sm md:grid-cols-3">
           <div>

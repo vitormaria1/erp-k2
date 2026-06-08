@@ -4,12 +4,20 @@ import { listStockProducts } from "@/lib/queries";
 import { PRODUCT_STOCK_COLUMNS } from "@/lib/product-columns";
 import { StockTableClient } from "./stock-table-client";
 
-export default async function EstoquePage(props: { searchParams?: Promise<{ q?: string }> }) {
+export default async function EstoquePage(props: { searchParams?: Promise<{ q?: string; active?: string }> }) {
   const sp = (await props.searchParams) ?? {};
   const q = sp.q ?? "";
-  const rows = listStockProducts({ q });
+  const active = sp.active ?? "";
+  const baseRows = listStockProducts({ q });
+  const rows = baseRows.filter((row) => {
+    const isActive = Boolean(row.active);
+    if (active === "yes" && !isActive) return false;
+    if (active === "no" && isActive) return false;
+    return true;
+  });
   const summary = {
     total: rows.length,
+    active: rows.filter((row) => Boolean(row.active)).length,
     lowStock: rows.filter((row) => {
       const stock = Number(row.stock_qty ?? 0);
       const min = row.min_stock == null ? null : Number(row.min_stock);
@@ -62,6 +70,11 @@ export default async function EstoquePage(props: { searchParams?: Promise<{ q?: 
               placeholder="Buscar por descrição, referência..."
               className="w-full rounded-xl border bg-[var(--card)] px-4 py-3 text-sm outline-none md:w-[420px]"
             />
+            <select name="active" defaultValue={active} className="rounded-xl border bg-[var(--card)] px-4 py-3 text-sm">
+              <option value="">Cadastro: todos</option>
+              <option value="yes">Somente ATIVO</option>
+              <option value="no">Somente INATIVO</option>
+            </select>
             <button className="rounded-xl bg-black px-4 py-3 text-sm font-semibold text-white">
               Buscar
             </button>
@@ -74,6 +87,11 @@ export default async function EstoquePage(props: { searchParams?: Promise<{ q?: 
           <div className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Produtos</div>
           <div className="mt-2 text-3xl font-semibold">{summary.total}</div>
           <div className="mt-1 text-sm text-[var(--muted)]">Cadastros no resultado atual</div>
+        </div>
+        <div className="rounded-2xl border bg-[var(--card)] p-5 shadow-sm">
+          <div className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Ativos</div>
+          <div className="mt-2 text-3xl font-semibold">{summary.active}</div>
+          <div className="mt-1 text-sm text-[var(--muted)]">Disponíveis para pedido/NF</div>
         </div>
         <div className="rounded-2xl border bg-[var(--card)] p-5 shadow-sm">
           <div className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Estoque baixo</div>

@@ -38,6 +38,9 @@ function formatValue(column: ProductColumnConfig, row: ProductRecord) {
     const numberValue = Number(value);
     return Number.isFinite(numberValue) ? numberValue.toFixed(3) : String(value);
   }
+  if (column.key === "active") {
+    return Number(value) ? "ATIVO" : "INATIVO";
+  }
   return String(value);
 }
 

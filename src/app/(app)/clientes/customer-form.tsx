@@ -124,6 +124,17 @@ export function CustomerForm({ action, customer, submitLabel }: CustomerFormProp
         {registrationFields.map((field) => (
           <TextField key={field.name} field={field} customer={customer} />
         ))}
+        <label className="block space-y-1">
+          <div className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Status</div>
+          <select
+            name="active"
+            defaultValue={customer ? (customer.active ? "1" : "0") : "1"}
+            className="w-full rounded-xl border bg-[var(--card)] px-4 py-3 text-sm outline-none focus:border-black/40"
+          >
+            <option value="1">ATIVO</option>
+            <option value="0">INATIVO</option>
+          </select>
+        </label>
         <label className="flex items-center gap-3 rounded-xl border bg-[var(--card)] px-4 py-3 text-sm md:mt-6">
           <input
             name="taxpayer"

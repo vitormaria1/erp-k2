@@ -60,6 +60,9 @@ export function ensureCustomerRouteDay(db: DbLike, customerId: string, weekday: 
 export function ensureCustomerSchema(db: DbLike) {
   if (customerSchemaReady) return;
 
+  db.exec("ALTER TABLE customers ADD COLUMN IF NOT EXISTS active BOOLEAN");
+  db.exec("ALTER TABLE customers ALTER COLUMN active SET DEFAULT TRUE");
+  db.exec("UPDATE customers SET active = TRUE WHERE active IS NULL");
   db.exec("ALTER TABLE customers ADD COLUMN IF NOT EXISTS seller TEXT");
   db.exec("ALTER TABLE customers ALTER COLUMN seller SET DEFAULT 'VANDO'");
   db.exec("UPDATE customers SET seller = 'VANDO' WHERE seller IS NULL OR BTRIM(seller) = ''");

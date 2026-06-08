@@ -3,7 +3,7 @@ import Link from "next/link";
 import { listCustomers } from "@/lib/queries";
 
 export default async function ClientesPage(props: {
-  searchParams?: Promise<{ q?: string; uf?: string; blocked?: string; taxpayer?: string; tracks?: string }>;
+  searchParams?: Promise<{ q?: string; uf?: string; blocked?: string; taxpayer?: string; tracks?: string; active?: string }>;
 }) {
   const sp = (await props.searchParams) ?? {};
   const q = sp.q ?? "";
@@ -11,8 +11,11 @@ export default async function ClientesPage(props: {
   const blocked = sp.blocked ?? "";
   const taxpayer = sp.taxpayer ?? "";
   const tracks = sp.tracks ?? "";
+  const active = sp.active ?? "";
   const baseRows = listCustomers({ q, limit: 500 });
   const rows = baseRows.filter((row) => {
+    if (active === "yes" && !row.active) return false;
+    if (active === "no" && row.active) return false;
     if (uf && row.uf !== uf) return false;
     if (blocked === "yes" && !row.blocked) return false;
     if (blocked === "no" && row.blocked) return false;
@@ -27,6 +30,7 @@ export default async function ClientesPage(props: {
   ).sort();
   const summary = {
     total: rows.length,
+    active: rows.filter((row) => Boolean(row.active)).length,
     blocked: rows.filter((row) => Boolean(row.blocked)).length,
     taxpayers: rows.filter((row) => Boolean(row.taxpayer)).length,
     tracksOrders: rows.filter((row) => Boolean(row.tracksOrders)).length,
@@ -62,6 +66,11 @@ export default async function ClientesPage(props: {
               <option value="yes">Somente bloqueados</option>
               <option value="no">Somente ativos</option>
             </select>
+            <select name="active" defaultValue={active} className="rounded-xl border bg-[var(--card)] px-4 py-3 text-sm">
+              <option value="">Cadastro: todos</option>
+              <option value="yes">Somente ATIVO</option>
+              <option value="no">Somente INATIVO</option>
+            </select>
             <select name="taxpayer" defaultValue={taxpayer} className="rounded-xl border bg-[var(--card)] px-4 py-3 text-sm">
               <option value="">Contribuinte: todos</option>
               <option value="yes">Somente contribuintes</option>
@@ -92,6 +101,11 @@ export default async function ClientesPage(props: {
           <div className="mt-1 text-sm text-[var(--muted)]">Resultado atual da busca</div>
         </div>
         <div className="rounded-2xl border bg-[var(--card)] p-5 shadow-sm">
+          <div className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Ativos</div>
+          <div className="mt-2 text-3xl font-semibold">{summary.active}</div>
+          <div className="mt-1 text-sm text-[var(--muted)]">Disponíveis para pedido/NF</div>
+        </div>
+        <div className="rounded-2xl border bg-[var(--card)] p-5 shadow-sm">
           <div className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Contribuintes</div>
           <div className="mt-2 text-3xl font-semibold">{summary.taxpayers}</div>
           <div className="mt-1 text-sm text-[var(--muted)]">Com IE / perfil fiscal ativo</div>
@@ -113,6 +127,7 @@ export default async function ClientesPage(props: {
           <thead className="bg-black/[0.02] text-left text-[var(--muted)]">
             <tr>
               <th className="px-4 py-3">Código</th>
+              <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3">Nome</th>
               <th className="px-4 py-3">Fantasia</th>
               <th className="px-4 py-3">Vendedor</th>
@@ -146,6 +161,11 @@ export default async function ClientesPage(props: {
             {rows.map((c) => (
               <tr key={c.id} className="border-t align-top">
                 <td className="px-4 py-3 font-medium">{c.code}</td>
+                <td className="px-4 py-3">
+                  <span className={["rounded-full px-3 py-1 text-xs font-semibold", c.active ? "bg-emerald-100 text-emerald-800" : "bg-zinc-200 text-zinc-700"].join(" ")}>
+                    {c.active ? "ATIVO" : "INATIVO"}
+                  </span>
+                </td>
                 <td className="px-4 py-3 font-semibold">{c.name}</td>
                 <td className="px-4 py-3 text-[var(--muted)]">{c.tradeName ?? "-"}</td>
                 <td className="px-4 py-3">{c.seller ?? "-"}</td>
@@ -184,7 +204,7 @@ export default async function ClientesPage(props: {
             ))}
             {rows.length === 0 ? (
               <tr>
-                <td className="px-4 py-8 text-[var(--muted)]" colSpan={28}>
+                <td className="px-4 py-8 text-[var(--muted)]" colSpan={29}>
                   Nenhum cliente encontrado.
                 </td>
               </tr>

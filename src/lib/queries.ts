@@ -1,5 +1,6 @@
 import { getDb } from "./db";
 import { getSaoPauloDateIso, getSaoPauloYearMonth } from "./datetime";
+import { ensureProductSchema } from "./catalog-schema";
 import { ensureCustomerSchema } from "./customer-schema";
 
 export type DashboardMetrics = {
@@ -28,6 +29,7 @@ export type LowStockItem = {
 
 export type CustomerRow = {
   id: string;
+  active: number;
   code: string;
   cnpj: string | null;
   stateTaxId: string | null;
@@ -60,6 +62,7 @@ export type CustomerRow = {
 
 export type ProductRow = {
   id: string;
+  active: number;
   reference: string;
   teleRef: string | null;
   barcode: string | null;
@@ -160,6 +163,7 @@ export function listLowStock(limit = 6): LowStockItem[] {
 const customerSelect = `
   SELECT
     id,
+    active,
     code,
     cnpj,
     state_tax_id as stateTaxId,
@@ -209,14 +213,16 @@ const customerSelect = `
   FROM customers
 `;
 
-export function listCustomers(opts: { q?: string; limit?: number } = {}): CustomerRow[] {
+export function listCustomers(opts: { q?: string; limit?: number; activeOnly?: boolean } = {}): CustomerRow[] {
   const db = getDb();
   ensureCustomerSchema(db);
   const q = (opts.q ?? "").trim();
   const limit = opts.limit ?? 50;
+  const activeOnly = opts.activeOnly ?? false;
   if (!q) {
+    const where = activeOnly ? "WHERE active = TRUE" : "";
     return db
-      .prepare(`${customerSelect} ORDER BY ${CUSTOMER_CODE_ORDER_SQL} LIMIT ?`)
+      .prepare(`${customerSelect} ${where} ORDER BY ${CUSTOMER_CODE_ORDER_SQL} LIMIT ?`)
       .all(limit) as CustomerRow[];
   }
   return db
@@ -224,6 +230,7 @@ export function listCustomers(opts: { q?: string; limit?: number } = {}): Custom
       `
       ${customerSelect}
       WHERE
+        (${activeOnly ? "active = TRUE AND" : ""}
         name LIKE ? OR trade_name LIKE ? OR code LIKE ? OR cnpj LIKE ? OR
         cep LIKE ? OR city LIKE ? OR phone LIKE ? OR email LIKE ? OR
         home_page LIKE ? OR block_reason LIKE ? OR customer_type_code LIKE ? OR
@@ -240,6 +247,7 @@ export function listCustomers(opts: { q?: string; limit?: number } = {}): Custom
                 WHEN 5 THEN 'Sexta'
               END
             ) LIKE ?
+        )
         )
       ORDER BY ${CUSTOMER_CODE_ORDER_SQL}
       LIMIT ?
@@ -268,10 +276,12 @@ export function getCustomerById(id: string): CustomerRow | null {
   return (db.prepare(`${customerSelect} WHERE id = ?`).get(id) as CustomerRow | undefined) ?? null;
 }
 
-export function listProducts(opts: { q?: string; limit?: number } = {}): ProductRow[] {
+export function listProducts(opts: { q?: string; limit?: number; activeOnly?: boolean } = {}): ProductRow[] {
   const db = getDb();
+  ensureProductSchema(db);
   const q = (opts.q ?? "").trim();
   const limit = opts.limit;
+  const activeOnly = opts.activeOnly ?? false;
   if (!q) {
     if (typeof limit === "number") {
       return db
@@ -279,6 +289,7 @@ export function listProducts(opts: { q?: string; limit?: number } = {}): Product
           `
           SELECT
             id,
+            active,
             reference,
             tele_ref as teleRef,
             barcode,
@@ -296,6 +307,7 @@ export function listProducts(opts: { q?: string; limit?: number } = {}): Product
             stock_qty as stockQty,
             min_stock as minStock
           FROM products
+          ${activeOnly ? "WHERE active = TRUE" : ""}
           ORDER BY ${PRODUCT_REFERENCE_ORDER_SQL}
           LIMIT ?
         `
@@ -307,6 +319,7 @@ export function listProducts(opts: { q?: string; limit?: number } = {}): Product
         `
         SELECT
           id,
+          active,
           reference,
           tele_ref as teleRef,
           barcode,
@@ -324,6 +337,7 @@ export function listProducts(opts: { q?: string; limit?: number } = {}): Product
           stock_qty as stockQty,
           min_stock as minStock
         FROM products
+        ${activeOnly ? "WHERE active = TRUE" : ""}
         ORDER BY ${PRODUCT_REFERENCE_ORDER_SQL}
       `
       )
@@ -335,6 +349,7 @@ export function listProducts(opts: { q?: string; limit?: number } = {}): Product
         `
         SELECT
           id,
+          active,
           reference,
           tele_ref as teleRef,
           barcode,
@@ -352,7 +367,7 @@ export function listProducts(opts: { q?: string; limit?: number } = {}): Product
           stock_qty as stockQty,
           min_stock as minStock
         FROM products
-        WHERE description LIKE ? OR reference LIKE ? OR barcode LIKE ? OR gtin LIKE ? OR tele_ref LIKE ?
+        WHERE ${activeOnly ? "active = TRUE AND (" : ""}description LIKE ? OR reference LIKE ? OR barcode LIKE ? OR gtin LIKE ? OR tele_ref LIKE ?${activeOnly ? ")" : ""}
         ORDER BY ${PRODUCT_REFERENCE_ORDER_SQL}
         LIMIT ?
       `
@@ -364,6 +379,7 @@ export function listProducts(opts: { q?: string; limit?: number } = {}): Product
       `
       SELECT
         id,
+        active,
         reference,
         tele_ref as teleRef,
         barcode,
@@ -381,7 +397,7 @@ export function listProducts(opts: { q?: string; limit?: number } = {}): Product
         stock_qty as stockQty,
         min_stock as minStock
       FROM products
-      WHERE description LIKE ? OR reference LIKE ? OR barcode LIKE ? OR gtin LIKE ? OR tele_ref LIKE ?
+      WHERE ${activeOnly ? "active = TRUE AND (" : ""}description LIKE ? OR reference LIKE ? OR barcode LIKE ? OR gtin LIKE ? OR tele_ref LIKE ?${activeOnly ? ")" : ""}
       ORDER BY ${PRODUCT_REFERENCE_ORDER_SQL}
     `
     )
@@ -390,6 +406,7 @@ export function listProducts(opts: { q?: string; limit?: number } = {}): Product
 
 export function listStockProducts(opts: { q?: string } = {}): ProductRecord[] {
   const db = getDb();
+  ensureProductSchema(db);
   const q = (opts.q ?? "").trim();
   if (!q) {
     return db
@@ -418,5 +435,6 @@ export function listStockProducts(opts: { q?: string } = {}): ProductRecord[] {
 
 export function getProductById(id: string): ProductRecord | null {
   const db = getDb();
+  ensureProductSchema(db);
   return (db.prepare("SELECT * FROM products WHERE id = ?").get(id) as ProductRecord | undefined) ?? null;
 }

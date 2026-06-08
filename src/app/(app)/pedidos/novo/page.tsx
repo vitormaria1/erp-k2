@@ -1,4 +1,6 @@
 import { getDb } from "@/lib/db";
+import { ensureProductSchema } from "@/lib/catalog-schema";
+import { ensureCustomerSchema } from "@/lib/customer-schema";
 import { OrderItemsClient, type ProductOpt } from "./order-items-client";
 import { CustomerSelectClient, type CustomerOpt } from "./customer-select-client";
 import { EmitInvoiceSubmitClient } from "./emit-invoice-submit-client";
@@ -6,26 +8,28 @@ import { PaymentFieldsClient } from "./payment-fields-client";
 
 function getOptions() {
   const db = getDb();
+  ensureCustomerSchema(db);
+  ensureProductSchema(db);
   let customers: CustomerOpt[];
   let products: ProductOpt[];
 
   try {
     customers = db
-      .prepare("SELECT id, name, trade_name as tradeName, code, cnpj FROM customers ORDER BY name")
+      .prepare("SELECT id, name, trade_name as tradeName, code, cnpj FROM customers WHERE active = TRUE ORDER BY name")
       .all() as CustomerOpt[];
   } catch {
     customers = db
-      .prepare("SELECT id, name, NULL as tradeName, code, NULL as cnpj FROM customers ORDER BY name")
+      .prepare("SELECT id, name, NULL as tradeName, code, NULL as cnpj FROM customers WHERE active = TRUE ORDER BY name")
       .all() as CustomerOpt[];
   }
 
   try {
     products = db
-      .prepare('SELECT id, description, reference, unit, price, "Preco Venda" as salePriceRaw FROM products ORDER BY description')
+      .prepare('SELECT id, description, reference, unit, price, "Preco Venda" as salePriceRaw FROM products WHERE active = TRUE ORDER BY description')
       .all() as ProductOpt[];
   } catch {
     products = db
-      .prepare("SELECT id, description, id as reference, 'UN' as unit, NULL as price, NULL as salePriceRaw FROM products ORDER BY description")
+      .prepare("SELECT id, description, id as reference, 'UN' as unit, NULL as price, NULL as salePriceRaw FROM products WHERE active = TRUE ORDER BY description")
       .all() as ProductOpt[];
   }
 
