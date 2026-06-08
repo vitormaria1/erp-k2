@@ -1,5 +1,6 @@
 import { FocusNFeClient } from "../providers/focus";
 import { getFiscalDbPool } from "../infra/pg";
+import type { FiscalDbClient } from "../infra/pg";
 import { withPgTx } from "../persistence/pg/tx";
 import { FiscalEventRepositoryPg, FiscalInvoiceRepositoryPg, FiscalJobRepositoryPg } from "../persistence/pg";
 
@@ -54,6 +55,77 @@ function mapFocusStatusToInternalStatus(status: string | null) {
     default:
       return null;
   }
+}
+
+function getKnownBodyMessage(body: unknown) {
+  if (!isRecord(body)) return "";
+  return [
+    body.mensagem,
+    body.mensagem_sefaz,
+    body.status_sefaz,
+    body.erro,
+    body.codigo,
+  ]
+    .filter((value) => typeof value === "string")
+    .join(" ")
+    .toLowerCase();
+}
+
+function isTemporaryFocusFailure(args: { httpStatus?: number; body?: unknown; errorMessage?: string | null }) {
+  const msg = [args.errorMessage ?? "", getKnownBodyMessage(args.body)].join(" ").toLowerCase();
+  const temporaryPatterns = [
+    "timeout",
+    "temporar",
+    "indispon",
+    "instab",
+    "processando",
+    "conex",
+    "socket",
+    "econn",
+    "timed out",
+    "etimedout",
+    "eai_again",
+    "abort",
+    "service unavailable",
+    "bad gateway",
+    "gateway timeout",
+    "try again",
+  ];
+
+  if ((args.httpStatus ?? 0) >= 500) return true;
+  if ((args.httpStatus ?? 0) === 429 || (args.httpStatus ?? 0) === 408) return true;
+  if (msg.includes("sefaz") && (msg.includes("indispon") || msg.includes("conex") || msg.includes("instab"))) {
+    return true;
+  }
+
+  return temporaryPatterns.some((pattern) => msg.includes(pattern));
+}
+
+async function markJobForRetry(args: {
+  client: FiscalDbClient;
+  invoiceRepo: FiscalInvoiceRepositoryPg;
+  jobRepo: FiscalJobRepositoryPg;
+  eventRepo: FiscalEventRepositoryPg;
+  invoiceId: string;
+  jobId: string;
+  eventType: string;
+  eventPayload: unknown;
+  error: string;
+  retryAt: Date;
+}) {
+  await args.invoiceRepo.setInternalStatus({ client: args.client, invoiceId: args.invoiceId, status: "TEMP_ERROR" });
+  await args.eventRepo.append({
+    client: args.client,
+    invoiceId: args.invoiceId,
+    type: args.eventType,
+    payload: args.eventPayload,
+  });
+  await args.jobRepo.markFailed({
+    client: args.client,
+    jobId: args.jobId,
+    error: args.error,
+    retryAt: args.retryAt,
+  });
 }
 
 function asIssuePayload(v: unknown): IssueNfeJobPayload {
@@ -171,11 +243,56 @@ export async function processNextFiscalJob(
         return { handled: true, jobId: job.id, kind: job.kind };
       }
 
+      if (
+        focusStatus === "erro_autorizacao" &&
+        isTemporaryFocusFailure({ httpStatus: res.httpStatus, body })
+      ) {
+        const attempts = job.attempts ?? 0;
+        const delayS = backoffSeconds(attempts);
+        const retryAt = new Date(Date.now() + delayS * 1000);
+        await withPgTx(pool, async (client) => {
+          await markJobForRetry({
+            client,
+            invoiceRepo,
+            jobRepo,
+            eventRepo,
+            invoiceId,
+            jobId: job.id,
+            eventType: "ISSUE_RETRY",
+            eventPayload: { httpStatus: res.httpStatus, body, focusRef },
+            error: "issue_temp_error",
+            retryAt,
+          });
+        });
+        return { handled: true, jobId: job.id, kind: job.kind };
+      }
+
       const mappedStatus = mapFocusStatusToInternalStatus(focusStatus);
       if (mappedStatus) {
         await withPgTx(pool, async (client) => {
           await invoiceRepo.setInternalStatus({ client, invoiceId, status: mappedStatus });
           await jobRepo.markDone({ client, jobId: job.id });
+        });
+        return { handled: true, jobId: job.id, kind: job.kind };
+      }
+
+      if (isTemporaryFocusFailure({ httpStatus: res.httpStatus, body })) {
+        const attempts = job.attempts ?? 0;
+        const delayS = backoffSeconds(attempts);
+        const retryAt = new Date(Date.now() + delayS * 1000);
+        await withPgTx(pool, async (client) => {
+          await markJobForRetry({
+            client,
+            invoiceRepo,
+            jobRepo,
+            eventRepo,
+            invoiceId,
+            jobId: job.id,
+            eventType: "ISSUE_RETRY",
+            eventPayload: { httpStatus: res.httpStatus, body, focusRef },
+            error: "issue_temp_error",
+            retryAt,
+          });
         });
         return { handled: true, jobId: job.id, kind: job.kind };
       }
@@ -231,10 +348,35 @@ export async function processNextFiscalJob(
         const delayS = backoffSeconds(attempts + 1);
         const retryAt = new Date(Date.now() + delayS * 1000);
         await withPgTx(pool, async (client) => {
+          await invoiceRepo.setInternalStatus({ client, invoiceId, status: "ISSUING" });
           await jobRepo.markFailed({
             client,
             jobId: job.id,
             error: "still_processing",
+            retryAt,
+          });
+          await jobRepo.updatePayload({ client, jobId: job.id, payload: { ...payload, attempts: attempts + 1 } });
+        });
+        return { handled: true, jobId: job.id, kind: job.kind };
+      }
+
+      if (
+        focusStatus === "erro_autorizacao" &&
+        isTemporaryFocusFailure({ httpStatus: res.httpStatus, body })
+      ) {
+        const delayS = backoffSeconds(attempts + 1);
+        const retryAt = new Date(Date.now() + delayS * 1000);
+        await withPgTx(pool, async (client) => {
+          await markJobForRetry({
+            client,
+            invoiceRepo,
+            jobRepo,
+            eventRepo,
+            invoiceId,
+            jobId: job.id,
+            eventType: "POLL_RETRY",
+            eventPayload: { httpStatus: res.httpStatus, body, focusRef, attempts: attempts + 1 },
+            error: "poll_temp_error",
             retryAt,
           });
           await jobRepo.updatePayload({ client, jobId: job.id, payload: { ...payload, attempts: attempts + 1 } });
@@ -247,6 +389,27 @@ export async function processNextFiscalJob(
         await withPgTx(pool, async (client) => {
           await invoiceRepo.setInternalStatus({ client, invoiceId, status: mappedStatus });
           await jobRepo.markDone({ client, jobId: job.id });
+        });
+        return { handled: true, jobId: job.id, kind: job.kind };
+      }
+
+      if (isTemporaryFocusFailure({ httpStatus: res.httpStatus, body })) {
+        const delayS = backoffSeconds(attempts + 1);
+        const retryAt = new Date(Date.now() + delayS * 1000);
+        await withPgTx(pool, async (client) => {
+          await markJobForRetry({
+            client,
+            invoiceRepo,
+            jobRepo,
+            eventRepo,
+            invoiceId,
+            jobId: job.id,
+            eventType: "POLL_RETRY",
+            eventPayload: { httpStatus: res.httpStatus, body, focusRef, attempts: attempts + 1 },
+            error: "poll_temp_error",
+            retryAt,
+          });
+          await jobRepo.updatePayload({ client, jobId: job.id, payload: { ...payload, attempts: attempts + 1 } });
         });
         return { handled: true, jobId: job.id, kind: job.kind };
       }
@@ -326,7 +489,24 @@ export async function processNextFiscalJob(
     const attempts = job.attempts ?? 0;
     const delayS = backoffSeconds(attempts);
     const retryAt = new Date(Date.now() + delayS * 1000);
+    const tempFailure = isTemporaryFocusFailure({ errorMessage: msg });
     await withPgTx(pool, async (client) => {
+      if (job.invoice_id && tempFailure) {
+        await markJobForRetry({
+          client,
+          invoiceRepo,
+          jobRepo,
+          eventRepo,
+          invoiceId: job.invoice_id,
+          jobId: job.id,
+          eventType: "JOB_RETRY",
+          eventPayload: { kind: job.kind, error: msg },
+          error: msg,
+          retryAt,
+        });
+        return;
+      }
+
       await jobRepo.markFailed({ client, jobId: job.id, error: msg, retryAt });
     });
     return { handled: true, jobId: job.id, kind: job.kind };

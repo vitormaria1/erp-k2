@@ -378,8 +378,11 @@ function getFiscalStatusMeta(fiscal: FiscalInvoiceSummary | null, fiscalAvailabl
   if (["READY_TO_ISSUE", "ISSUING", "CANCELING"].includes(fiscal.internalStatus)) {
     return { label: fiscal.internalStatus, className: "bg-amber-100 text-amber-800" };
   }
+  if (fiscal.internalStatus === "TEMP_ERROR") {
+    return { label: "Instabilidade", className: "bg-orange-100 text-orange-800" };
+  }
   if (["REJECTED", "DENIED", "ERROR"].includes(fiscal.internalStatus)) {
-    return { label: fiscal.internalStatus, className: "bg-red-100 text-red-800" };
+    return { label: "Falha final", className: "bg-red-100 text-red-800" };
   }
   if (fiscal.internalStatus === "CANCELED") {
     return { label: "Cancelada", className: "bg-zinc-200 text-zinc-700" };

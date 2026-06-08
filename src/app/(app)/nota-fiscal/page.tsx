@@ -65,6 +65,27 @@ async function listFiscalInvoicesFiltered(args: { q: string; limit: number }) {
   return res.rows as FiscalInvoiceListRow[];
 }
 
+function getInvoiceStatusMeta(status: string | null | undefined) {
+  switch (status) {
+    case "AUTHORIZED":
+      return { label: "Autorizada", className: "bg-emerald-100 text-emerald-800" };
+    case "READY_TO_ISSUE":
+    case "ISSUING":
+    case "CANCELING":
+      return { label: "Processando", className: "bg-amber-100 text-amber-800" };
+    case "TEMP_ERROR":
+      return { label: "Instabilidade", className: "bg-orange-100 text-orange-800" };
+    case "REJECTED":
+    case "DENIED":
+    case "ERROR":
+      return { label: "Falha final", className: "bg-red-100 text-red-800" };
+    case "CANCELED":
+      return { label: "Cancelada", className: "bg-zinc-200 text-zinc-700" };
+    default:
+      return { label: status ?? "-", className: "bg-black/[0.05] text-[var(--muted)]" };
+  }
+}
+
 export default async function NotaFiscalPage(props: { searchParams?: Promise<Record<string, string | string[]>> }) {
   const searchParams: Record<string, string | string[]> =
     (await props.searchParams?.catch(() => ({} as Record<string, string | string[]>))) ?? {};
@@ -77,6 +98,9 @@ export default async function NotaFiscalPage(props: { searchParams?: Promise<Rec
   const error = typeof errorParam === "string" ? errorParam : null;
   const autoPrintParam = searchParams.autoprint;
   const autoOpenDanfe = autoPrintParam === "1" || autoPrintParam === "true";
+  const lastInvoiceStatusMeta = getInvoiceStatusMeta(
+    typeof lastInvoice?.internal_status === "string" ? lastInvoice.internal_status : null
+  );
 
   const invoicesRes = await (async () => {
     try {
@@ -123,9 +147,14 @@ export default async function NotaFiscalPage(props: { searchParams?: Promise<Rec
               </div>
               <div>
                 <div className="font-semibold text-[var(--text)]">Status</div>
-                <div>
-                  {String(lastInvoice.internal_status ?? "-")} / Focus: {String(lastInvoice.focus_status ?? "-")} /
-                  SEFAZ: {String(lastInvoice.sefaz_status ?? "-")}
+                <div className="space-y-1">
+                  <span className={["inline-flex rounded-full px-2 py-1 text-[11px] font-semibold", lastInvoiceStatusMeta.className].join(" ")}>
+                    {lastInvoiceStatusMeta.label}
+                  </span>
+                  <div>
+                    {String(lastInvoice.internal_status ?? "-")} / Focus: {String(lastInvoice.focus_status ?? "-")} /
+                    SEFAZ: {String(lastInvoice.sefaz_status ?? "-")}
+                  </div>
                 </div>
               </div>
               <div>
@@ -144,6 +173,21 @@ export default async function NotaFiscalPage(props: { searchParams?: Promise<Rec
               NF ainda não encontrada. Se acabou de emitir, aguarde alguns segundos e esta tela atualizará sozinha.
             </div>
           )}
+          {lastInvoice?.internal_status === "TEMP_ERROR" ? (
+            <div className="mt-3 rounded-xl border border-orange-200 bg-orange-50 p-3 text-xs text-orange-900">
+              Instabilidade temporária detectada entre Focus/SEFAZ. O ERP continuará tentando automaticamente. Não reemita esta NF agora.
+            </div>
+          ) : null}
+          {lastInvoice && ["READY_TO_ISSUE", "ISSUING", "CANCELING"].includes(String(lastInvoice.internal_status)) ? (
+            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+              A nota ainda está em processamento. Esta tela atualiza sozinha enquanto o worker consulta a Focus.
+            </div>
+          ) : null}
+          {lastInvoice && ["REJECTED", "DENIED", "ERROR"].includes(String(lastInvoice.internal_status)) ? (
+            <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-900">
+              Esta NF terminou com falha final. Revise a mensagem SEFAZ e os cadastros antes de tentar novamente.
+            </div>
+          ) : null}
           <div className="mt-3 flex flex-wrap gap-2">
             <Link className="rounded-lg border px-3 py-1.5 text-xs font-semibold" href="/nota-fiscal">
               Limpar filtro
@@ -227,7 +271,16 @@ export default async function NotaFiscalPage(props: { searchParams?: Promise<Rec
                     <td className="py-2 pr-3">
                       {inv.serie}/{inv.numero ?? "-"}
                     </td>
-                    <td className="py-2 pr-3">{inv.internal_status}</td>
+                    <td className="py-2 pr-3">
+                      <span
+                        className={[
+                          "inline-flex rounded-full px-2 py-1 text-[11px] font-semibold",
+                          getInvoiceStatusMeta(inv.internal_status).className,
+                        ].join(" ")}
+                      >
+                        {getInvoiceStatusMeta(inv.internal_status).label}
+                      </span>
+                    </td>
                     <td className="py-2 pr-3">{inv.focus_status ?? inv.focus_ref ?? "-"}</td>
                     <td className="py-2 pr-3">{inv.sefaz_status ?? "-"}</td>
                     <td className="py-2 pr-3">{inv.chave_acesso ?? "-"}</td>

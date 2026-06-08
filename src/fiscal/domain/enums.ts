@@ -16,6 +16,7 @@ export type InvoiceInternalStatus =
   | "DRAFT"
   | "READY_TO_ISSUE"
   | "ISSUING"
+  | "TEMP_ERROR"
   | "CANCELING"
   | "AUTHORIZED"
   | "DENIED"

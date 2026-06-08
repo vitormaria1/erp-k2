@@ -290,6 +290,7 @@ function getFiscalBucket(fiscal: FiscalInvoiceSummary | null, fiscalAvailable: b
   if (!fiscal) return "NONE";
   if (fiscal.internalStatus === "AUTHORIZED") return "AUTHORIZED";
   if (["READY_TO_ISSUE", "ISSUING"].includes(fiscal.internalStatus)) return "IN_PROGRESS";
+  if (fiscal.internalStatus === "TEMP_ERROR") return "TEMP_ERROR";
   if (["REJECTED", "DENIED", "ERROR"].includes(fiscal.internalStatus)) return "ERROR";
   if (fiscal.internalStatus === "CANCELED") return "CANCELED";
   return "OTHER";
@@ -307,8 +308,10 @@ function getFiscalStatusMeta(fiscal: FiscalInvoiceSummary | null, fiscalAvailabl
       return { label: "NF-e autorizada", className: "bg-emerald-100 text-emerald-800" };
     case "IN_PROGRESS":
       return { label: "Em emissao", className: "bg-amber-100 text-amber-800" };
+    case "TEMP_ERROR":
+      return { label: "Instabilidade", className: "bg-orange-100 text-orange-800" };
     case "ERROR":
-      return { label: "Falha fiscal", className: "bg-red-100 text-red-800" };
+      return { label: "Falha final", className: "bg-red-100 text-red-800" };
     case "CANCELED":
       return { label: "NF-e cancelada", className: "bg-zinc-200 text-zinc-700" };
     default:
@@ -337,8 +340,9 @@ function summarizeOrders(orders: Row[]) {
   const fiscalBars = [
     { key: "AUTHORIZED", label: "Autorizadas", count: orders.filter((order) => getFiscalBucket(order.fiscal, order.fiscalAvailable) === "AUTHORIZED").length },
     { key: "IN_PROGRESS", label: "Em emissao", count: orders.filter((order) => getFiscalBucket(order.fiscal, order.fiscalAvailable) === "IN_PROGRESS").length },
+    { key: "TEMP_ERROR", label: "Instabilidade", count: orders.filter((order) => getFiscalBucket(order.fiscal, order.fiscalAvailable) === "TEMP_ERROR").length },
     { key: "NONE", label: "Sem NF-e", count: orders.filter((order) => getFiscalBucket(order.fiscal, order.fiscalAvailable) === "NONE").length },
-    { key: "ERROR", label: "Com falha", count: orders.filter((order) => getFiscalBucket(order.fiscal, order.fiscalAvailable) === "ERROR").length },
+    { key: "ERROR", label: "Falha final", count: orders.filter((order) => getFiscalBucket(order.fiscal, order.fiscalAvailable) === "ERROR").length },
   ];
 
   const todayIso = getSaoPauloDateIso();
@@ -482,8 +486,9 @@ export default async function PedidosPage(props: {
             <option value="">Todo fiscal</option>
             <option value="AUTHORIZED">NF-e autorizada</option>
             <option value="IN_PROGRESS">Em emissao</option>
+            <option value="TEMP_ERROR">Instabilidade</option>
             <option value="NONE">Sem NF-e</option>
-            <option value="ERROR">Com falha</option>
+            <option value="ERROR">Falha final</option>
             <option value="CANCELED">Cancelada</option>
             <option value="UNAVAILABLE">Fiscal indisponivel</option>
           </select>
@@ -573,6 +578,8 @@ export default async function PedidosPage(props: {
                 ? "bg-emerald-500"
                 : item.key === "IN_PROGRESS"
                   ? "bg-amber-500"
+                  : item.key === "TEMP_ERROR"
+                    ? "bg-orange-500"
                   : item.key === "ERROR"
                     ? "bg-red-500"
                     : "bg-zinc-500",

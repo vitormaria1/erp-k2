@@ -130,7 +130,7 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
     return popup;
   }
 
-  async function waitForDanfe(invoiceId: string) {
+  async function waitForDanfe(invoiceId: string, redirectTo?: string) {
     const finalDanfeUrl = `/api/fiscal/invoices/${encodeURIComponent(invoiceId)}/danfe`;
     const maxAttempts = 30;
 
@@ -158,6 +158,19 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
                 : "NF autorizada. A guia foi fechada; clique abaixo para abrir a DANFE.",
             orderPrintUrl: prev.orderPrintUrl,
             danfeUrl: finalDanfeUrl,
+          }));
+          return;
+        }
+
+        if (status === "TEMP_ERROR") {
+          if (popupRef.current && !popupRef.current.closed && redirectTo) {
+            popupRef.current.location.href = redirectTo;
+          }
+          setNotice((prev) => ({
+            tone: "error",
+            text: "Instabilidade temporária detectada. O ERP continuará tentando automaticamente; acompanhe pela tela de Nota Fiscal.",
+            orderPrintUrl: prev.orderPrintUrl,
+            danfeUrl: undefined,
           }));
           return;
         }
@@ -226,7 +239,7 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
               orderPrintUrl: payload.orderPrintUrl,
               danfeUrl: undefined,
             });
-            void waitForDanfe(payload.invoiceId);
+            void waitForDanfe(payload.invoiceId, payload.redirectTo);
           }
           return;
         }

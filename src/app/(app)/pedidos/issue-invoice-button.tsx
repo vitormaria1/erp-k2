@@ -117,11 +117,23 @@ export function IssueInvoiceButton(props: {
           return;
         }
 
+        if (status === "TEMP_ERROR") {
+          if (popupRef.current && !popupRef.current.closed) {
+            popupRef.current.location.href = redirectTo;
+          } else {
+            router.push(redirectTo);
+          }
+          throw new Error("Instabilidade temporária detectada. O ERP continuará tentando automaticamente; acompanhe pela tela de Nota Fiscal.");
+        }
+
         if (status && ["REJECTED", "DENIED", "ERROR", "CANCELED"].includes(status)) {
           throw new Error(`A emissão fiscal terminou com status ${status}.`);
         }
       } catch (pollError) {
-        if (pollError instanceof Error && /terminou com status/i.test(pollError.message)) {
+        if (
+          pollError instanceof Error &&
+          (/terminou com status/i.test(pollError.message) || /Instabilidade tempor/i.test(pollError.message))
+        ) {
           throw pollError;
         }
       }
