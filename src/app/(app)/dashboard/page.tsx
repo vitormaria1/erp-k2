@@ -47,7 +47,7 @@ export default function DashboardPage() {
         <div className="rounded-2xl border bg-[var(--card)] p-5 shadow-sm lg:col-span-2">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-base font-semibold">Checklist de tarefas</h2>
+              <h2 className="text-base font-semibold">LISTA DE TAREFAS DO DIA</h2>
               <div className="text-sm text-[var(--muted)]">
                 {doneCount}/{tasks.length} conclu&iacute;das
               </div>

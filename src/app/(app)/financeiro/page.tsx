@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { getFiscalDbPool } from "@/fiscal/infra/pg";
 import { getDb } from "@/lib/db";
 import { formatDate, formatDateTime, getSaoPauloDateIso, startOfSaoPauloWeekIso } from "@/lib/datetime";
@@ -128,6 +130,8 @@ type CashDaySummary = {
   balance: number;
   movements: number;
 };
+
+type FinanceSection = "dashboard" | "caixa" | "rotas" | "receber" | "pagar";
 
 function listReceivables(limit = 120): Row[] {
   const db = getDb();
@@ -537,14 +541,101 @@ function StatCard(props: { label: string; value: string; sub: string }) {
   );
 }
 
+function FinanceSectionCard(props: {
+  title: string;
+  description: string;
+  href: string;
+  metrics: Array<{ label: string; value: string }>;
+}) {
+  return (
+    <Link
+      href={props.href}
+      className="rounded-2xl border bg-[var(--card)] p-5 shadow-sm transition hover:border-black/20 hover:bg-black/[0.015]"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-semibold">{props.title}</h2>
+          <div className="mt-1 text-sm text-[var(--muted)]">{props.description}</div>
+        </div>
+        <span className="rounded-full border px-3 py-1 text-xs font-semibold">Abrir</span>
+      </div>
+      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {props.metrics.map((metric) => (
+          <div key={metric.label} className="rounded-xl border bg-black/[0.02] px-4 py-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">{metric.label}</div>
+            <div className="mt-1 text-lg font-semibold">{metric.value}</div>
+          </div>
+        ))}
+      </div>
+    </Link>
+  );
+}
+
+function buildFinanceHref(args: {
+  setor: FinanceSection;
+  cashPeriod: CashPeriod;
+  activeLoadingId: string;
+}) {
+  const params = new URLSearchParams();
+  params.set("setor", args.setor);
+  params.set("preset", args.cashPeriod.preset);
+  params.set("from", args.cashPeriod.from);
+  params.set("to", args.cashPeriod.to);
+  if (args.activeLoadingId) params.set("loadingId", args.activeLoadingId);
+  return `/financeiro?${params.toString()}`;
+}
+
+function FinanceSectionNav(props: {
+  active: FinanceSection;
+  cashPeriod: CashPeriod;
+  activeLoadingId: string;
+}) {
+  const items: Array<{ key: FinanceSection; label: string }> = [
+    { key: "dashboard", label: "Dashboard" },
+    { key: "caixa", label: "Caixa" },
+    { key: "rotas", label: "Rotas" },
+    { key: "receber", label: "Contas a receber" },
+    { key: "pagar", label: "Contas a pagar" },
+  ];
+
+  return (
+    <div className="mt-6 flex flex-wrap gap-2">
+      {items.map((item) => {
+        const active = props.active === item.key;
+        return (
+          <Link
+            key={item.key}
+            href={buildFinanceHref({
+              setor: item.key,
+              cashPeriod: props.cashPeriod,
+              activeLoadingId: props.activeLoadingId,
+            })}
+            className={[
+              "rounded-xl px-4 py-2 text-sm font-semibold transition",
+              active ? "bg-black text-white" : "border bg-[var(--card)] hover:bg-black/[0.03]",
+            ].join(" ")}
+          >
+            {item.label}
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
 export default async function FinanceiroPage(props: {
-  searchParams?: Promise<{ loadingId?: string; from?: string; to?: string; preset?: string }>;
+  searchParams?: Promise<{ loadingId?: string; from?: string; to?: string; preset?: string; setor?: string }>;
 }) {
   if (!(await isFinanceAuthenticated())) {
     return <FinanceUnlockForm />;
   }
 
   const sp = (await props.searchParams) ?? {};
+  const setorParam = sp.setor?.trim() ?? "";
+  const activeSection: FinanceSection =
+    setorParam === "caixa" || setorParam === "rotas" || setorParam === "receber" || setorParam === "pagar"
+      ? setorParam
+      : "dashboard";
   const loadingId = sp.loadingId?.trim() ?? "";
   const cashPeriod = resolveCashPeriod(sp);
   const rawRows = listReceivables();
@@ -582,6 +673,7 @@ export default async function FinanceiroPage(props: {
       <div className="mt-1 text-sm text-[var(--muted)]">
         Controle de pagamentos, caixa e acompanhamento operacional dos pedidos.
       </div>
+      <FinanceSectionNav active={activeSection} cashPeriod={cashPeriod} activeLoadingId={activeLoadingId} />
 
       <section className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
         <StatCard label="Titulos" value={String(summary.totalCount)} sub="Lancamentos no painel" />
@@ -601,6 +693,48 @@ export default async function FinanceiroPage(props: {
         />
       </section>
 
+      {activeSection === "dashboard" ? (
+        <section className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-2">
+          <FinanceSectionCard
+            title="Caixa"
+            description="Fluxo do periodo, com movimentacoes, metodos e fechamento diario."
+            href={buildFinanceHref({ setor: "caixa", cashPeriod, activeLoadingId })}
+            metrics={[
+              { label: "Saldo", value: money.format(cashSummary.incoming - cashSummary.outgoing) },
+              { label: "Volume", value: money.format(cashVolume) },
+            ]}
+          />
+          <FinanceSectionCard
+            title="Fechamento da rota"
+            description="Conferencia dos pedidos carregados e definicao do que foi recebido."
+            href={buildFinanceHref({ setor: "rotas", cashPeriod, activeLoadingId })}
+            metrics={[
+              { label: "Pedidos", value: String(routeSummary.orders) },
+              { label: "Pendentes", value: String(routeSummary.pending) },
+            ]}
+          />
+          <FinanceSectionCard
+            title="Contas a receber"
+            description="Titulos de clientes, baixas e status financeiro dos pedidos."
+            href={buildFinanceHref({ setor: "receber", cashPeriod, activeLoadingId })}
+            metrics={[
+              { label: "Pendentes", value: money.format(summary.pendingAmount) },
+              { label: "Pagos", value: money.format(summary.paidAmount) },
+            ]}
+          />
+          <FinanceSectionCard
+            title="Contas a pagar"
+            description="Obrigacoes de compras, vencimentos e baixas para fornecedores."
+            href={buildFinanceHref({ setor: "pagar", cashPeriod, activeLoadingId })}
+            metrics={[
+              { label: "Pendentes", value: money.format(payableSummary.pendingAmount) },
+              { label: "Pagos", value: money.format(payableSummary.paidAmount) },
+            ]}
+          />
+        </section>
+      ) : null}
+
+      {activeSection === "caixa" ? (
       <section className="mt-6 rounded-2xl border bg-[var(--card)] p-5 shadow-sm">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -690,7 +824,9 @@ export default async function FinanceiroPage(props: {
           </table>
         </div>
       </section>
+      ) : null}
 
+      {activeSection === "caixa" ? (
       <section className="mt-6 rounded-2xl border bg-[var(--card)] p-5 shadow-sm">
         <div>
           <h2 className="text-base font-semibold">Relatorio de fluxo de caixa</h2>
@@ -788,7 +924,9 @@ export default async function FinanceiroPage(props: {
           </div>
         </div>
       </section>
+      ) : null}
 
+      {activeSection === "rotas" ? (
       <section className="mt-6 rounded-2xl border bg-[var(--card)] p-5 shadow-sm">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -937,7 +1075,9 @@ export default async function FinanceiroPage(props: {
           </div>
         )}
       </section>
+      ) : null}
 
+      {activeSection === "receber" ? (
       <section className="mt-6">
         <div className="mb-3">
           <h2 className="text-base font-semibold">Contas a receber</h2>
@@ -1127,7 +1267,9 @@ export default async function FinanceiroPage(props: {
           </table>
         </div>
       </section>
+      ) : null}
 
+      {activeSection === "pagar" ? (
       <section className="mt-6">
         <div className="mb-3">
           <h2 className="text-base font-semibold">Contas a pagar</h2>
@@ -1237,6 +1379,7 @@ export default async function FinanceiroPage(props: {
           </table>
         </div>
       </section>
+      ) : null}
     </div>
   );
 }
