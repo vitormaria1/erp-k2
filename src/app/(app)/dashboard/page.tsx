@@ -1,5 +1,12 @@
 import { Topbar } from "@/components/topbar";
-import { getDashboardMetrics, listLowStock, listRecentOrders } from "@/lib/queries";
+import { listDashboardTasks } from "@/lib/dashboard-tasks";
+import { getDashboardMetrics, listLowStock } from "@/lib/queries";
+import {
+  createDashboardTaskAction,
+  deleteDashboardTaskAction,
+  toggleDashboardTaskDoneAction,
+  updateDashboardTaskAction,
+} from "./actions";
 
 function StatCard(props: { label: string; value: string; sub?: string }) {
   return (
@@ -15,8 +22,9 @@ function StatCard(props: { label: string; value: string; sub?: string }) {
 
 export default function DashboardPage() {
   const metrics = getDashboardMetrics();
-  const recent = listRecentOrders(6);
+  const tasks = listDashboardTasks(12);
   const lowStock = listLowStock(6);
+  const doneCount = tasks.filter((task) => Boolean(task.done)).length;
 
   const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
   return (
@@ -38,43 +46,90 @@ export default function DashboardPage() {
       <section className="grid grid-cols-1 gap-4 px-6 py-6 lg:grid-cols-3">
         <div className="rounded-2xl border bg-[var(--card)] p-5 shadow-sm lg:col-span-2">
           <div className="flex items-center justify-between">
-            <h2 className="text-base font-semibold">Pedidos recentes</h2>
-            <a href="/pedidos" className="text-sm font-medium text-[var(--k2-red-2)]">
-              Ver todos
-            </a>
+            <div>
+              <h2 className="text-base font-semibold">Checklist de tarefas</h2>
+              <div className="text-sm text-[var(--muted)]">
+                {doneCount}/{tasks.length} conclu&iacute;das
+              </div>
+            </div>
           </div>
-          <div className="mt-4 overflow-hidden rounded-xl border">
-            <table className="w-full text-sm">
-              <thead className="bg-black/[0.02] text-left text-[var(--muted)]">
-                <tr>
-                  <th className="px-4 py-3">#</th>
-                  <th className="px-4 py-3">Cliente</th>
-                  <th className="px-4 py-3">Itens</th>
-                  <th className="px-4 py-3">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recent.map((o) => (
-                  <tr key={o.id} className="border-t">
-                    <td className="px-4 py-3 font-medium">#{o.id}</td>
-                    <td className="px-4 py-3">{o.customerName}</td>
-                    <td className="px-4 py-3">{o.itemsCount}</td>
-                    <td className="px-4 py-3">
-                      <span className="rounded-full bg-black/[0.04] px-3 py-1 text-xs font-semibold">
-                        {o.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-                {recent.length === 0 ? (
-                  <tr>
-                    <td className="px-4 py-6 text-[var(--muted)]" colSpan={4}>
-                      Nenhum pedido ainda. Clique em “Novo pedido”.
-                    </td>
-                  </tr>
-                ) : null}
-              </tbody>
-            </table>
+          <form action={createDashboardTaskAction} className="mt-4 grid gap-3 rounded-xl border bg-black/[0.02] p-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_auto]">
+            <input
+              name="title"
+              required
+              placeholder="Nova tarefa"
+              className="rounded-xl border bg-[var(--card)] px-4 py-3 text-sm"
+            />
+            <input
+              name="notes"
+              placeholder="Observa&ccedil;&otilde;es"
+              className="rounded-xl border bg-[var(--card)] px-4 py-3 text-sm"
+            />
+            <button className="rounded-xl bg-black px-4 py-3 text-sm font-semibold text-white">
+              Adicionar
+            </button>
+          </form>
+          <div className="mt-4 space-y-3">
+            {tasks.map((task) => (
+              <div key={task.id} className="rounded-xl border p-4">
+                <div className="flex items-start gap-3">
+                  <form action={toggleDashboardTaskDoneAction} className="pt-1">
+                    <input type="hidden" name="id" value={task.id} />
+                    <input type="hidden" name="done" value={task.done ? "0" : "1"} />
+                    <button
+                      type="submit"
+                      aria-label={task.done ? "Marcar tarefa como pendente" : "Marcar tarefa como concluída"}
+                      className={[
+                        "flex h-5 w-5 items-center justify-center rounded border",
+                        task.done ? "border-emerald-600 bg-emerald-600 text-white" : "border-black/20 bg-white",
+                      ].join(" ")}
+                    >
+                      {task.done ? "✓" : ""}
+                    </button>
+                  </form>
+                  <form action={updateDashboardTaskAction} className="flex-1 space-y-3">
+                    <input type="hidden" name="id" value={task.id} />
+                    <input type="hidden" name="done" value={task.done ? "on" : ""} />
+                    <input
+                      name="title"
+                      defaultValue={task.title}
+                      className={[
+                        "w-full rounded-xl border bg-[var(--card)] px-4 py-3 text-sm font-medium",
+                        task.done ? "text-[var(--muted)] line-through" : "",
+                      ].join(" ")}
+                    />
+                    <textarea
+                      name="notes"
+                      defaultValue={task.notes ?? ""}
+                      rows={2}
+                      placeholder="Observa&ccedil;&otilde;es"
+                      className="w-full rounded-xl border bg-[var(--card)] px-4 py-3 text-sm"
+                    />
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-xs text-[var(--muted)]">
+                        Atualizada em {new Date(task.updatedAt).toLocaleString("pt-BR")}
+                      </div>
+                      <div className="flex gap-2">
+                        <button className="rounded-xl border px-3 py-2 text-xs font-semibold">
+                          Salvar
+                        </button>
+                      </div>
+                    </div>
+                  </form>
+                  <form action={deleteDashboardTaskAction}>
+                    <input type="hidden" name="id" value={task.id} />
+                    <button className="rounded-xl border border-red-200 px-3 py-2 text-xs font-semibold text-[var(--k2-red-2)]">
+                      Excluir
+                    </button>
+                  </form>
+                </div>
+              </div>
+            ))}
+            {tasks.length === 0 ? (
+              <div className="rounded-xl border p-6 text-sm text-[var(--muted)]">
+                Nenhuma tarefa cadastrada ainda. Use o formul&aacute;rio acima para montar sua checklist.
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -111,4 +166,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-

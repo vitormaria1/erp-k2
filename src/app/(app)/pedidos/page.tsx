@@ -327,7 +327,7 @@ function hasActiveFiscalInvoice(fiscal: FiscalInvoiceSummary | null) {
   return !["CANCELED", "DENIED"].includes(fiscal.internalStatus);
 }
 
-function summarizeOrders(orders: Row[]) {
+function summarizeOrders(orders: Row[], trendOrders: Row[] = orders) {
   const totalValue = orders.reduce((sum, order) => sum + order.totalAmount, 0);
   const sentCount = orders.filter((order) => order.status === "ENVIADO").length;
   const deliveredCount = orders.filter((order) => order.status === "ENTREGUE").length;
@@ -350,10 +350,10 @@ function summarizeOrders(orders: Row[]) {
     const date = new Date(`${todayIso}T12:00:00Z`);
     date.setUTCDate(date.getUTCDate() - (6 - index));
     const iso = getSaoPauloDateIso(date);
-      const dayOrders = orders.filter((order) => {
-        const date = parseAppDate(order.createdAt);
-        return date ? getSaoPauloDateIso(date) === iso : false;
-      });
+    const dayOrders = trendOrders.filter((order) => {
+      const date = parseAppDate(order.createdAt);
+      return date ? getSaoPauloDateIso(date) === iso : false;
+    });
     return {
       iso,
       label: iso.slice(5),
@@ -429,8 +429,14 @@ export default async function PedidosPage(props: {
   };
 
   const orders = await listOrders(filters);
+  const trendOrders = await listOrders({
+    ...filters,
+    period: "last7",
+    from: "",
+    to: "",
+  });
   const suggestions = listOrderSearchSuggestions();
-  const summary = summarizeOrders(orders);
+  const summary = summarizeOrders(orders, trendOrders);
   const ambiente = getConfiguredFocusAmbiente();
   const fiscalLabel = ambiente === "producao" ? "P" : "H";
   const fiscalTitle =
