@@ -18,6 +18,38 @@ export function ensureFinancialSchema(db: DbLike) {
   if (schemaReady) return;
 
   db.exec(`
+    CREATE TABLE IF NOT EXISTS boletos (
+      id UUID PRIMARY KEY,
+      receivable_id UUID NOT NULL UNIQUE,
+      payload_json TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (receivable_id) REFERENCES receivables(id) ON DELETE CASCADE
+    )
+  `);
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_boletos_receivable_id ON boletos(receivable_id)");
+
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS boleto_webhook_events (
+      id UUID PRIMARY KEY,
+      event_id TEXT NOT NULL UNIQUE,
+      receivable_id UUID,
+      nosso_numero TEXT,
+      movimento TEXT NOT NULL,
+      event_date TEXT,
+      event_at TEXT,
+      amount DOUBLE PRECISION,
+      processing_status TEXT NOT NULL DEFAULT 'RECEIVED',
+      raw_json TEXT NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (receivable_id) REFERENCES receivables(id) ON DELETE SET NULL
+    )
+  `);
+  db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_boleto_webhook_event_id ON boleto_webhook_events(event_id)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_boleto_webhook_receivable ON boleto_webhook_events(receivable_id)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_boleto_webhook_status_event_date ON boleto_webhook_events(processing_status, event_date)");
+
+  db.exec(`
     CREATE TABLE IF NOT EXISTS payables (
       id UUID PRIMARY KEY,
       purchase_invoice_id UUID,

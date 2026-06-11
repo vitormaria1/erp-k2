@@ -5,12 +5,14 @@ import { getDb } from "@/lib/db";
 import { formatDate, formatDateTime, getSaoPauloDateIso, startOfSaoPauloWeekIso } from "@/lib/datetime";
 import { ensureFinancialSchema } from "@/lib/financial-ledger";
 import { getOrderPaymentMethodLabel } from "@/lib/payments";
+import { extractLinhaDigitavel, extractNossoNumero } from "@/lib/sicredi-cobranca";
+import { getBoletoWebhookVisualState, reconcileDeferredSicrediSettlements } from "@/lib/sicredi-webhook";
 import { isFinanceAuthenticated } from "@/lib/simple-auth";
 
 import {
   closeRouteOrderAction,
   financeLockAction,
-  gerarBoletoMockAction,
+  gerarBoletoAction,
   settleReceivableAction,
   settlePayableAction,
   startRouteClosureAction,
@@ -38,6 +40,8 @@ type Row = {
   orderId: number | null;
   orderStatus: string | null;
   hasBoleto: number;
+  boletoId: string | null;
+  boletoPayloadJson: string | null;
   createdAt: string;
 };
 
@@ -150,7 +154,9 @@ function listReceivables(limit = 120): Row[] {
         c.name as customerName,
         r.order_id as orderId,
         o.status as orderStatus,
-        CASE WHEN b.receivable_id IS NULL THEN 0 ELSE 1 END as hasBoleto
+        CASE WHEN b.receivable_id IS NULL THEN 0 ELSE 1 END as hasBoleto,
+        b.id as boletoId,
+        b.payload_json as boletoPayloadJson
       FROM receivables r
       JOIN customers c ON c.id = r.customer_id
       LEFT JOIN orders o ON o.id = r.order_id
@@ -160,6 +166,25 @@ function listReceivables(limit = 120): Row[] {
     `
     )
     .all(limit) as Row[];
+}
+
+function parseBoletoPayload(payloadJson: string | null) {
+  if (!payloadJson) return null;
+  try {
+    const parsed = JSON.parse(payloadJson) as unknown;
+    return {
+      raw: parsed,
+      linhaDigitavel: extractLinhaDigitavel(parsed),
+      nossoNumero: extractNossoNumero(parsed),
+      provider:
+        parsed && typeof parsed === "object" && "provider" in parsed && typeof parsed.provider === "string"
+          ? parsed.provider
+          : null,
+      webhook: getBoletoWebhookVisualState(payloadJson),
+    };
+  } catch {
+    return null;
+  }
 }
 
 function listPayables(limit = 120): PayableRow[] {
@@ -629,6 +654,8 @@ export default async function FinanceiroPage(props: {
   if (!(await isFinanceAuthenticated())) {
     return <FinanceUnlockForm />;
   }
+
+  reconcileDeferredSicrediSettlements();
 
   const sp = (await props.searchParams) ?? {};
   const setorParam = sp.setor?.trim() ?? "";
@@ -1112,6 +1139,7 @@ export default async function FinanceiroPage(props: {
                 const orderSelectValue = getNormalizedOrderStatus(r.orderStatus);
                 const fiscalMeta = getFiscalStatusMeta(r.fiscal, fiscalAvailable);
                 const paymentMeta = getPaymentMeta(r.status);
+                const boleto = parseBoletoPayload(r.boletoPayloadJson);
                 return (
                   <tr key={r.id} className="border-t align-top">
                   <td className="px-4 py-3">
@@ -1217,9 +1245,40 @@ export default async function FinanceiroPage(props: {
                   <td className="px-4 py-3">
                     {r.method === "BOLETO" ? (
                       r.hasBoleto ? (
-                        <span className="text-xs text-[var(--muted)]">Gerado</span>
+                        <div className="space-y-1 text-xs">
+                          <div className="font-semibold">Gerado</div>
+                          {boleto?.nossoNumero ? <div>NN {boleto.nossoNumero}</div> : null}
+                          {boleto?.linhaDigitavel ? (
+                            <div className="max-w-[240px] break-all text-[var(--muted)]">{boleto.linhaDigitavel}</div>
+                          ) : null}
+                          {boleto?.webhook?.pendingConfirmation ? (
+                            <div className="rounded-lg bg-amber-100 px-2 py-1 text-amber-800">
+                              Liquidacao recebida via rede. Confirmacao no fim do dia.
+                            </div>
+                          ) : null}
+                          {boleto?.webhook?.paidAt ? (
+                            <div className="rounded-lg bg-emerald-100 px-2 py-1 text-emerald-800">
+                              Pago em {formatDate(boleto.webhook.paidAt)}
+                            </div>
+                          ) : null}
+                          {boleto?.webhook?.reversedAt ? (
+                            <div className="rounded-lg bg-rose-100 px-2 py-1 text-rose-800">
+                              Estornado em {formatDate(boleto.webhook.reversedAt)}
+                            </div>
+                          ) : null}
+                          {r.boletoId && boleto?.linhaDigitavel ? (
+                            <a
+                              href={`/api/financeiro/boletos/${encodeURIComponent(r.id)}/pdf`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex rounded-xl border px-3 py-2 font-semibold hover:bg-black/[0.03]"
+                            >
+                              Abrir PDF
+                            </a>
+                          ) : null}
+                        </div>
                       ) : (
-                        <form action={gerarBoletoMockAction}>
+                        <form action={gerarBoletoAction}>
                           <input type="hidden" name="receivableId" value={r.id} />
                           <button className="rounded-xl border bg-[var(--card)] px-3 py-2 text-xs font-semibold hover:bg-black/[0.03]">
                             Gerar
