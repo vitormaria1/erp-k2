@@ -3,11 +3,14 @@ import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { parseAppDate } from "@/lib/datetime";
 import { formatDateTime, getSaoPauloDateIso, getSaoPauloYearMonth } from "@/lib/datetime";
+import { ensureFinancialSchema } from "@/lib/financial-ledger";
 import { ensureOrderPaymentSchema, getOrderPaymentMethodLabel } from "@/lib/payments";
+import { extractLinhaDigitavel, extractNossoNumero } from "@/lib/sicredi-cobranca";
+import { getBoletoWebhookVisualState } from "@/lib/sicredi-webhook";
 import { getFiscalDbPool } from "@/fiscal/infra/pg";
 import { getConfiguredFocusAmbiente } from "@/fiscal/providers/focus";
 
-import { updateOrderStatusAction } from "./actions";
+import { gerarPedidoBoletoAction, updateOrderStatusAction } from "./actions";
 import { IssueInvoiceButton } from "./issue-invoice-button";
 import { getOrderStatusMeta, normalizeOrderStatus, ORDER_STATUS_VALUES, type OrderStatus } from "./status";
 
@@ -23,6 +26,7 @@ type Row = {
   customerAddressOk: boolean;
   fiscal: FiscalInvoiceSummary | null;
   fiscalAvailable: boolean;
+  receivables: ReceivableSummary[];
 };
 
 type QueryFilters = {
@@ -47,6 +51,16 @@ type FiscalInvoiceSummaryRow = {
   internalStatus: string;
   serie: string;
   numero: number | null;
+};
+
+type ReceivableSummary = {
+  id: string;
+  status: string;
+  amount: number;
+  dueDate: string;
+  paidAt: string | null;
+  hasBoleto: boolean;
+  boletoPayloadJson: string | null;
 };
 
 function normalizeLegacyOrderStatuses() {
@@ -75,6 +89,7 @@ async function listOrders(filters: QueryFilters, limit = 200): Promise<Row[]> {
 
   const db = getDb();
   ensureOrderPaymentSchema(db);
+  ensureFinancialSchema(db);
   const where: string[] = [];
   const params: Array<string | number> = [];
 
@@ -130,6 +145,7 @@ async function listOrders(filters: QueryFilters, limit = 200): Promise<Row[]> {
   const { byOrderId: fiscalByOrderId, available: fiscalAvailable } = await loadFiscalInvoicesByOrderId(
     rows.map((row) => row.id)
   );
+  const receivablesByOrderId = loadReceivablesByOrderId(rows.map((row) => row.id));
 
   const filtered = rows.map((row) => ({
     id: row.id,
@@ -149,6 +165,7 @@ async function listOrders(filters: QueryFilters, limit = 200): Promise<Row[]> {
       !!row.customerCep,
     fiscal: fiscalByOrderId.get(row.id) ?? null,
     fiscalAvailable,
+    receivables: receivablesByOrderId.get(row.id) ?? [],
   }));
 
   const { from, to } = resolveDateRange(filters);
@@ -285,6 +302,60 @@ async function loadFiscalInvoicesByOrderId(orderIds: number[]) {
   return { byOrderId, available: true };
 }
 
+function loadReceivablesByOrderId(orderIds: number[]) {
+  const byOrderId = new Map<number, ReceivableSummary[]>();
+  if (orderIds.length === 0) return byOrderId;
+
+  const db = getDb();
+  ensureFinancialSchema(db);
+
+  const placeholders = orderIds.map(() => "?").join(", ");
+  const rows = db
+    .prepare(
+      `
+      SELECT
+        r.order_id as orderId,
+        r.id as id,
+        r.status as status,
+        r.amount as amount,
+        r.due_date as dueDate,
+        r.paid_at as paidAt,
+        CASE WHEN b.receivable_id IS NULL THEN 0 ELSE 1 END as hasBoleto,
+        b.payload_json as boletoPayloadJson
+      FROM receivables r
+      LEFT JOIN boletos b ON b.receivable_id = r.id
+      WHERE r.order_id IN (${placeholders})
+      ORDER BY r.order_id ASC, r.due_date ASC, r.created_at ASC
+    `
+    )
+    .all(...orderIds) as Array<{
+    orderId: number;
+    id: string;
+    status: string;
+    amount: number;
+    dueDate: string;
+    paidAt: string | null;
+    hasBoleto: number;
+    boletoPayloadJson: string | null;
+  }>;
+
+  for (const row of rows) {
+    const current = byOrderId.get(row.orderId) ?? [];
+    current.push({
+      id: row.id,
+      status: row.status,
+      amount: Number(row.amount ?? 0),
+      dueDate: row.dueDate,
+      paidAt: row.paidAt,
+      hasBoleto: row.hasBoleto === 1,
+      boletoPayloadJson: row.boletoPayloadJson,
+    });
+    byOrderId.set(row.orderId, current);
+  }
+
+  return byOrderId;
+}
+
 function getFiscalBucket(fiscal: FiscalInvoiceSummary | null, fiscalAvailable: boolean) {
   if (!fiscalAvailable) return "UNAVAILABLE";
   if (!fiscal) return "NONE";
@@ -325,6 +396,33 @@ function getFiscalStatusMeta(fiscal: FiscalInvoiceSummary | null, fiscalAvailabl
 function hasActiveFiscalInvoice(fiscal: FiscalInvoiceSummary | null) {
   if (!fiscal) return false;
   return !["CANCELED", "DENIED"].includes(fiscal.internalStatus);
+}
+
+function parseBoletoPayload(payloadJson: string | null) {
+  if (!payloadJson) return null;
+  try {
+    const parsed = JSON.parse(payloadJson) as unknown;
+    return {
+      linhaDigitavel: extractLinhaDigitavel(parsed),
+      nossoNumero: extractNossoNumero(parsed),
+      webhook: getBoletoWebhookVisualState(payloadJson),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function getReceivableStatusMeta(status: string) {
+  switch (status) {
+    case "PAID":
+      return { label: "Pago", className: "bg-emerald-100 text-emerald-800" };
+    case "OVERDUE":
+      return { label: "Vencido", className: "bg-orange-100 text-orange-800" };
+    case "CANCELED":
+      return { label: "Cancelado", className: "bg-zinc-200 text-zinc-700" };
+    default:
+      return { label: "Pendente", className: "bg-amber-100 text-amber-800" };
+  }
 }
 
 function summarizeOrders(orders: Row[], trendOrders: Row[] = orders) {
@@ -594,7 +692,7 @@ export default async function PedidosPage(props: {
       </section>
 
       <div className="mt-6 overflow-x-auto rounded-2xl border bg-[var(--card)] shadow-sm">
-        <table className="min-w-[980px] w-full text-sm">
+        <table className="min-w-[1240px] w-full text-sm">
           <thead className="bg-black/[0.02] text-left text-[var(--muted)]">
             <tr>
               <th className="px-4 py-3">#</th>
@@ -605,6 +703,7 @@ export default async function PedidosPage(props: {
               <th className="px-4 py-3">Pagamento</th>
               <th className="px-4 py-3">Criado em</th>
               <th className="px-4 py-3">Fiscal</th>
+              <th className="px-4 py-3">Cobranca</th>
             </tr>
           </thead>
           <tbody>
@@ -695,11 +794,84 @@ export default async function PedidosPage(props: {
                     </div>
                   </div>
                 </td>
+                <td className="px-4 py-3">
+                  {order.paymentMethod !== "BOLETO" ? (
+                    <span className="text-xs text-[var(--muted)]">Nao se aplica</span>
+                  ) : order.receivables.length === 0 ? (
+                    <span className="text-xs text-[var(--muted)]">Sem recebivel gerado</span>
+                  ) : (
+                    <div className="space-y-3">
+                      {order.receivables.map((receivable, index) => {
+                        const boleto = parseBoletoPayload(receivable.boletoPayloadJson);
+                        const statusMeta = getReceivableStatusMeta(receivable.status);
+                        return (
+                          <div key={receivable.id} className="min-w-[260px] rounded-xl border p-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="text-xs font-semibold">
+                                {order.receivables.length > 1
+                                  ? `Parcela ${index + 1}/${order.receivables.length}`
+                                  : "Parcela unica"}
+                              </div>
+                              <span
+                                className={[
+                                  "inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold",
+                                  statusMeta.className,
+                                ].join(" ")}
+                              >
+                                {statusMeta.label}
+                              </span>
+                            </div>
+                            <div className="mt-2 text-xs text-[var(--muted)]">
+                              Vencimento {receivable.dueDate.slice(0, 10)} • {money.format(receivable.amount)}
+                            </div>
+                            {boleto?.nossoNumero ? <div className="mt-2 text-xs">NN {boleto.nossoNumero}</div> : null}
+                            {boleto?.linhaDigitavel ? (
+                              <div className="mt-1 break-all text-[11px] text-[var(--muted)]">{boleto.linhaDigitavel}</div>
+                            ) : null}
+                            {boleto?.webhook?.pendingConfirmation ? (
+                              <div className="mt-2 rounded-lg bg-amber-100 px-2 py-1 text-[11px] text-amber-800">
+                                Liquidacao recebida. Confirmacao no fim do dia.
+                              </div>
+                            ) : null}
+                            {boleto?.webhook?.paidAt ? (
+                              <div className="mt-2 rounded-lg bg-emerald-100 px-2 py-1 text-[11px] text-emerald-800">
+                                Pago em {boleto.webhook.paidAt.slice(0, 10)}
+                              </div>
+                            ) : null}
+                            {receivable.hasBoleto ? (
+                              <div className="mt-3">
+                                <a
+                                  href={`/api/financeiro/boletos/${encodeURIComponent(receivable.id)}/pdf`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex rounded-lg border px-3 py-1.5 text-xs font-semibold"
+                                >
+                                  Abrir boleto
+                                </a>
+                              </div>
+                            ) : hasActiveFiscalInvoice(order.fiscal) && order.fiscal?.internalStatus === "AUTHORIZED" ? (
+                              <form action={gerarPedidoBoletoAction} className="mt-3">
+                                <input type="hidden" name="receivableId" value={receivable.id} />
+                                <button className="rounded-lg border px-3 py-1.5 text-xs font-semibold">
+                                  Gerar boleto
+                                </button>
+                              </form>
+                            ) : (
+                              <div className="mt-3 text-[11px] text-[var(--muted)]">
+                                Disponivel apos a NF-e ser autorizada.
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </td>
               </tr>
             ))}
             {orders.length === 0 ? (
               <tr>
-                <td className="px-4 py-8 text-[var(--muted)]" colSpan={8}>
+                <td className="px-4 py-8 text-[var(--muted)]" colSpan={9}>
                   Nenhum pedido encontrado com os filtros atuais.
                 </td>
               </tr>

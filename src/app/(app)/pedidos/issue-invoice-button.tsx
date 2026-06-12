@@ -92,7 +92,7 @@ export function IssueInvoiceButton(props: {
     };
   }, []);
 
-  async function waitForDanfe(invoiceId: string, redirectTo: string) {
+  async function waitForDanfe(invoiceId: string, redirectTo: string, postAuthorizedRedirectTo?: string) {
     const finalDanfeUrl = `/api/fiscal/invoices/${encodeURIComponent(invoiceId)}/danfe`;
     const maxAttempts = 30;
 
@@ -109,10 +109,18 @@ export function IssueInvoiceButton(props: {
         const status = payload?.internal_status ?? null;
 
         if (status === "AUTHORIZED") {
-          if (popupRef.current && !popupRef.current.closed) {
-            popupRef.current.location.href = finalDanfeUrl;
+          if (postAuthorizedRedirectTo) {
+            if (popupRef.current && !popupRef.current.closed) {
+              popupRef.current.close();
+            }
+            router.refresh();
+            setError("NF autorizada. Gere o boleto na coluna de cobranca deste pedido.");
           } else {
-            router.push(`${redirectTo}${redirectTo.includes("?") ? "&" : "?"}autoprint=1`);
+            if (popupRef.current && !popupRef.current.closed) {
+              popupRef.current.location.href = finalDanfeUrl;
+            } else {
+              router.push(`${redirectTo}${redirectTo.includes("?") ? "&" : "?"}autoprint=1`);
+            }
           }
           return;
         }
@@ -158,7 +166,7 @@ export function IssueInvoiceButton(props: {
           body: formData,
         });
         const payload = (await res.json().catch(() => null)) as
-          | { redirectTo?: string; error?: string; duplicate?: boolean; invoiceId?: string }
+          | { redirectTo?: string; postAuthorizedRedirectTo?: string; error?: string; duplicate?: boolean; invoiceId?: string }
           | null;
 
         if (res.status === 409 && payload?.redirectTo) {
@@ -178,7 +186,7 @@ export function IssueInvoiceButton(props: {
           throw new Error("Resposta inválida da emissão");
         }
 
-        void waitForDanfe(payload.invoiceId, payload.redirectTo).catch((pollError) => {
+        void waitForDanfe(payload.invoiceId, payload.redirectTo, payload.postAuthorizedRedirectTo).catch((pollError) => {
           if (popupRef.current && !popupRef.current.closed) {
             popupRef.current.close();
           }

@@ -6,7 +6,7 @@ import {
   extractNossoNumero,
   SicrediCobrancaClient,
 } from "@/lib/sicredi-cobranca";
-import { isAuthenticated, isFinanceAuthenticated } from "@/lib/simple-auth";
+import { isAuthenticated } from "@/lib/simple-auth";
 
 function pdfResponse(pdf: Buffer, filename: string) {
   return new Response(new Uint8Array(pdf), {
@@ -22,9 +22,6 @@ function pdfResponse(pdf: Buffer, filename: string) {
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   if (!(await isAuthenticated())) {
     return new Response("Unauthorized", { status: 401 });
-  }
-  if (!(await isFinanceAuthenticated())) {
-    return new Response("FinanceUnauthorized", { status: 403 });
   }
 
   const { id } = await ctx.params;

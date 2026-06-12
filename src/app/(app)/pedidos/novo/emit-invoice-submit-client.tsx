@@ -12,6 +12,7 @@ type IssueResponse = {
   orderPrintUrl?: string;
   invoiceId?: string;
   redirectTo?: string;
+  postAuthorizedRedirectTo?: string;
   duplicate?: boolean;
   error?: string;
 };
@@ -45,6 +46,7 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
     text: string;
     orderPrintUrl?: string;
     danfeUrl?: string;
+    ordersUrl?: string;
   }>({
     tone: "idle",
     text: "",
@@ -130,7 +132,7 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
     return popup;
   }
 
-  async function waitForDanfe(invoiceId: string, redirectTo?: string) {
+  async function waitForDanfe(invoiceId: string, redirectTo?: string, postAuthorizedRedirectTo?: string) {
     const finalDanfeUrl = `/api/fiscal/invoices/${encodeURIComponent(invoiceId)}/danfe`;
     const maxAttempts = 30;
 
@@ -147,18 +149,32 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
         const status = payload?.internal_status ?? null;
 
         if (status === "AUTHORIZED") {
-          if (popupRef.current && !popupRef.current.closed) {
-            popupRef.current.location.href = finalDanfeUrl;
+          if (postAuthorizedRedirectTo) {
+            if (popupRef.current && !popupRef.current.closed) {
+              popupRef.current.close();
+            }
+            setNotice((prev) => ({
+              tone: "success",
+              text: "NF autorizada. Gere o boleto na tela de pedidos, na coluna de cobranca do pedido criado.",
+              orderPrintUrl: prev.orderPrintUrl,
+              danfeUrl: undefined,
+              ordersUrl: prev.ordersUrl,
+            }));
+          } else {
+            if (popupRef.current && !popupRef.current.closed) {
+              popupRef.current.location.href = finalDanfeUrl;
+            }
+            setNotice((prev) => ({
+              tone: popupRef.current && !popupRef.current.closed ? "success" : "error",
+              text:
+                popupRef.current && !popupRef.current.closed
+                  ? "NF autorizada. A DANFE foi aberta na outra guia."
+                  : "NF autorizada. A guia foi fechada; clique abaixo para abrir a DANFE.",
+              orderPrintUrl: prev.orderPrintUrl,
+              danfeUrl: finalDanfeUrl,
+              ordersUrl: prev.ordersUrl,
+            }));
           }
-          setNotice((prev) => ({
-            tone: popupRef.current && !popupRef.current.closed ? "success" : "error",
-            text:
-              popupRef.current && !popupRef.current.closed
-                ? "NF autorizada. A DANFE foi aberta na outra guia."
-                : "NF autorizada. A guia foi fechada; clique abaixo para abrir a DANFE.",
-            orderPrintUrl: prev.orderPrintUrl,
-            danfeUrl: finalDanfeUrl,
-          }));
           return;
         }
 
@@ -231,15 +247,17 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
             text: `Pedido #${payload.orderId ?? "-"} criado. A NF está sendo processada.`,
             orderPrintUrl: payload.orderPrintUrl,
             danfeUrl: undefined,
+            ordersUrl: payload.orderId ? `/pedidos?period=today&q=%23${payload.orderId}` : "/pedidos?period=today",
           });
           if (payload.invoiceId) {
             setNotice({
               tone: "loading",
-              text: `Pedido #${payload.orderId ?? "-"} criado. Aguardando autorização da NF para abrir a DANFE...`,
+              text: `Pedido #${payload.orderId ?? "-"} criado. Aguardando autorização da NF para liberar ${payload.postAuthorizedRedirectTo ? "a cobranca em Pedidos" : "a DANFE"}...`,
               orderPrintUrl: payload.orderPrintUrl,
               danfeUrl: undefined,
+              ordersUrl: payload.orderId ? `/pedidos?period=today&q=%23${payload.orderId}` : "/pedidos?period=today",
             });
-            void waitForDanfe(payload.invoiceId, payload.redirectTo);
+            void waitForDanfe(payload.invoiceId, payload.redirectTo, payload.postAuthorizedRedirectTo);
           }
           return;
         }
@@ -376,6 +394,11 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
             >
               Abrir DANFE
             </button>
+          ) : null}
+          {notice.ordersUrl ? (
+            <a className="mt-2 block font-semibold underline" href={notice.ordersUrl}>
+              Abrir pedido em Pedidos
+            </a>
           ) : null}
         </div>
       ) : null}
