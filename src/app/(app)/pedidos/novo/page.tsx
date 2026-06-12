@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { getDb } from "@/lib/db";
 import { ensureProductSchema } from "@/lib/catalog-schema";
 import { ensureCustomerSchema } from "@/lib/customer-schema";
@@ -41,9 +43,16 @@ export default function NovoPedidoPage() {
   const formId = "new-order-form";
   return (
     <div className="mx-auto max-w-6xl px-6 py-6">
-      <h1 className="text-2xl font-semibold">Novo pedido</h1>
-      <div className="mt-1 text-sm text-[var(--muted)]">
-        Selecione o cliente, monte os itens e crie o pedido.
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold">Novo pedido</h1>
+          <div className="mt-1 text-sm text-[var(--muted)]">
+            Selecione o cliente, monte os itens e crie o pedido.
+          </div>
+        </div>
+        <Link href="/pedidos" className="inline-flex rounded-xl border px-4 py-2 text-sm font-semibold">
+          Voltar para pedidos
+        </Link>
       </div>
 
       <form id={formId} className="mt-6 space-y-4 rounded-2xl border bg-[var(--card)] p-5">

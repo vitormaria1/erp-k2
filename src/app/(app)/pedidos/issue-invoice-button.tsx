@@ -109,18 +109,17 @@ export function IssueInvoiceButton(props: {
         const status = payload?.internal_status ?? null;
 
         if (status === "AUTHORIZED") {
+          if (popupRef.current && !popupRef.current.closed) {
+            popupRef.current.location.href = finalDanfeUrl;
+          } else if (!postAuthorizedRedirectTo) {
+            router.push(`${redirectTo}${redirectTo.includes("?") ? "&" : "?"}autoprint=1`);
+          }
+
           if (postAuthorizedRedirectTo) {
-            if (popupRef.current && !popupRef.current.closed) {
-              popupRef.current.close();
-            }
             router.refresh();
             setError("NF autorizada. Gere o boleto na coluna de cobranca deste pedido.");
           } else {
-            if (popupRef.current && !popupRef.current.closed) {
-              popupRef.current.location.href = finalDanfeUrl;
-            } else {
-              router.push(`${redirectTo}${redirectTo.includes("?") ? "&" : "?"}autoprint=1`);
-            }
+            setError(null);
           }
           return;
         }

@@ -149,21 +149,19 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
         const status = payload?.internal_status ?? null;
 
         if (status === "AUTHORIZED") {
+          if (popupRef.current && !popupRef.current.closed) {
+            popupRef.current.location.href = finalDanfeUrl;
+          }
+
           if (postAuthorizedRedirectTo) {
-            if (popupRef.current && !popupRef.current.closed) {
-              popupRef.current.close();
-            }
             setNotice((prev) => ({
               tone: "success",
-              text: "NF autorizada. Gere o boleto na tela de pedidos, na coluna de cobranca do pedido criado.",
+              text: "NF autorizada. A DANFE foi aberta na outra guia e a cobranca foi liberada na tela de pedidos.",
               orderPrintUrl: prev.orderPrintUrl,
-              danfeUrl: undefined,
+              danfeUrl: finalDanfeUrl,
               ordersUrl: prev.ordersUrl,
             }));
           } else {
-            if (popupRef.current && !popupRef.current.closed) {
-              popupRef.current.location.href = finalDanfeUrl;
-            }
             setNotice((prev) => ({
               tone: popupRef.current && !popupRef.current.closed ? "success" : "error",
               text:

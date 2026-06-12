@@ -10,8 +10,9 @@ import { getBoletoWebhookVisualState } from "@/lib/sicredi-webhook";
 import { getFiscalDbPool } from "@/fiscal/infra/pg";
 import { getConfiguredFocusAmbiente } from "@/fiscal/providers/focus";
 
-import { gerarPedidoBoletoAction, updateOrderStatusAction } from "./actions";
+import { updateOrderStatusAction } from "./actions";
 import { IssueInvoiceButton } from "./issue-invoice-button";
+import { PedidoBoletoButton } from "./pedido-boleto-button";
 import { getOrderStatusMeta, normalizeOrderStatus, ORDER_STATUS_VALUES, type OrderStatus } from "./status";
 
 type Row = {
@@ -850,12 +851,7 @@ export default async function PedidosPage(props: {
                                 </a>
                               </div>
                             ) : hasActiveFiscalInvoice(order.fiscal) && order.fiscal?.internalStatus === "AUTHORIZED" ? (
-                              <form action={gerarPedidoBoletoAction} className="mt-3">
-                                <input type="hidden" name="receivableId" value={receivable.id} />
-                                <button className="rounded-lg border px-3 py-1.5 text-xs font-semibold">
-                                  Gerar boleto
-                                </button>
-                              </form>
+                              <PedidoBoletoButton receivableId={receivable.id} />
                             ) : (
                               <div className="mt-3 text-[11px] text-[var(--muted)]">
                                 Disponivel apos a NF-e ser autorizada.
