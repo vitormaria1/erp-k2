@@ -8,6 +8,10 @@ function round2(v: number) {
   return Math.round(v * 100) / 100;
 }
 
+function round4(v: number) {
+  return Math.round(v * 10000) / 10000;
+}
+
 function optionalIbgeCode(v: string | null | undefined) {
   const digits = String(v ?? "").replace(/[^\d]/g, "");
   return /^\d{7}$/.test(digits) ? digits : undefined;
@@ -22,6 +26,40 @@ function parseOrigem(v: unknown) {
   const digit = raw.match(/\d/);
   const n = digit ? Number(digit[0]) : 0;
   return n >= 0 && n <= 8 ? n : 0;
+}
+
+function buildIbscbsFields(totalItem: number) {
+  const baseCalculo = round2(totalItem * 0.88);
+  const ibsUfAliquota = 0.1;
+  const ibsMunAliquota = 0;
+  const cbsAliquota = 0.9;
+  const reducaoAliquota = 60;
+  const ibsUfAliquotaEfetiva = 0.04;
+  const ibsMunAliquotaEfetiva = 0;
+  const cbsAliquotaEfetiva = 0.36;
+  const ibsUfValor = round2((baseCalculo * ibsUfAliquotaEfetiva) / 100);
+  const ibsMunValor = round2((baseCalculo * ibsMunAliquotaEfetiva) / 100);
+  const ibsValor = round2(ibsUfValor + ibsMunValor);
+  const cbsValor = round2((baseCalculo * cbsAliquotaEfetiva) / 100);
+
+  return {
+    ibscbs_cst: "200",
+    ibscbs_codigo_classificacao_tributaria: "200034",
+    ibscbs_base_calculo: baseCalculo,
+    ibscbs_ibs_uf_aliquota: round4(ibsUfAliquota),
+    ibscbs_ibs_uf_reducao_aliquota: round4(reducaoAliquota),
+    ibscbs_ibs_uf_aliquota_efetiva: round4(ibsUfAliquotaEfetiva),
+    ibscbs_ibs_uf_valor: ibsUfValor,
+    ibscbs_ibs_mun_aliquota: round4(ibsMunAliquota),
+    ibscbs_ibs_mun_reducao_aliquota: round4(reducaoAliquota),
+    ibscbs_ibs_mun_aliquota_efetiva: round4(ibsMunAliquotaEfetiva),
+    ibscbs_ibs_mun_valor: ibsMunValor,
+    ibscbs_ibs_valor: ibsValor,
+    ibscbs_cbs_aliquota: round4(cbsAliquota),
+    ibscbs_cbs_reducao_aliquota: round4(reducaoAliquota),
+    ibscbs_cbs_aliquota_efetiva: round4(cbsAliquotaEfetiva),
+    ibscbs_cbs_valor: cbsValor,
+  };
 }
 
 export class FocusNFePayloadBuilder implements FiscalPayloadBuilder<Record<string, unknown>> {
@@ -46,6 +84,8 @@ export class FocusNFePayloadBuilder implements FiscalPayloadBuilder<Record<strin
         const icmsRate = fiscalData.aliquotaIcms ?? 0;
         const pisRate = fiscalData.aliquotaPis ?? 0;
         const cofinsRate = fiscalData.aliquotaCofins ?? 0;
+        const shouldIncludeIbscbs =
+          fiscalData.cstIcms === "00" && fiscalData.cstPis === "01" && fiscalData.cstCofins === "01";
 
         return {
           numero_item: idx + 1,
@@ -74,6 +114,11 @@ export class FocusNFePayloadBuilder implements FiscalPayloadBuilder<Record<strin
           icms_aliquota: round2(icmsRate),
           icms_valor: round2((totalItem * icmsRate) / 100),
 
+          // Padrão observado nos XMLs antigos para operações normais:
+          // IPI não tributado com enquadramento legal 303.
+          ipi_situacao_tributaria: "52",
+          ipi_codigo_enquadramento_legal: "303",
+
           pis_situacao_tributaria: fiscalData.cstPis,
           pis_base_calculo: round2(totalItem),
           pis_aliquota_porcentual: round2(pisRate),
@@ -83,6 +128,7 @@ export class FocusNFePayloadBuilder implements FiscalPayloadBuilder<Record<strin
           cofins_base_calculo: round2(totalItem),
           cofins_aliquota_porcentual: round2(cofinsRate),
           cofins_valor: round2((totalItem * cofinsRate) / 100),
+          ...(shouldIncludeIbscbs ? buildIbscbsFields(totalItem) : {}),
         };
       })
     );
@@ -143,7 +189,7 @@ export class FocusNFePayloadBuilder implements FiscalPayloadBuilder<Record<strin
       valor_desconto: round2(totalDescontos),
       valor_produtos: round2(totalProdutos),
       valor_total: round2(totalNF),
-      modalidade_frete: 9,
+      modalidade_frete: 0,
 
       items,
     };
@@ -238,9 +284,9 @@ async function loadProductFiscalDataViaClient(client: FiscalDbClient, productId:
     cstIcms: "00",
     cstPis: "01",
     cstCofins: "01",
-    aliquotaIcms: 17,
-    aliquotaPis: 1.65,
-    aliquotaCofins: 7.6,
+    aliquotaIcms: 12,
+    aliquotaPis: 0,
+    aliquotaCofins: 0,
     cfopPadrao: "5101",
     beneficiosFiscais: [],
     tributacaoInterna: {},
