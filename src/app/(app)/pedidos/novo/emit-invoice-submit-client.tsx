@@ -2,6 +2,12 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 
+import {
+  FISCAL_OPERATION_CODE_VENDA_INTERNA,
+  PEDIDO_FISCAL_OPERATION_OPTIONS,
+  type PedidoFiscalOperationCode,
+} from "@/fiscal/config/operation_options";
+
 type Props = {
   formId: string;
 };
@@ -41,6 +47,9 @@ function resetOrderForm(form: HTMLFormElement) {
 
 export function EmitInvoiceSubmitClient({ formId }: Props) {
   const [isPending, startTransition] = useTransition();
+  const [fiscalOperationCode, setFiscalOperationCode] = useState<PedidoFiscalOperationCode>(
+    FISCAL_OPERATION_CODE_VENDA_INTERNA
+  );
   const [notice, setNotice] = useState<{
     tone: "idle" | "loading" | "success" | "error";
     text: string;
@@ -60,6 +69,18 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
       stoppedRef.current = true;
     };
   }, []);
+
+  useEffect(() => {
+    const form = document.getElementById(formId);
+    if (!(form instanceof HTMLFormElement)) return;
+
+    const handleReset = () => {
+      setFiscalOperationCode(FISCAL_OPERATION_CODE_VENDA_INTERNA);
+    };
+
+    form.addEventListener("reset", handleReset);
+    return () => form.removeEventListener("reset", handleReset);
+  }, [formId]);
 
   function openDanfeTargetWindow() {
     const popup = window.open("", "_blank");
@@ -227,6 +248,7 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
     startTransition(async () => {
       try {
         const formData = new FormData(form);
+        formData.set("fiscalOperationCode", fiscalOperationCode);
         const res = await fetch("/api/orders/create-and-issue", {
           method: "POST",
           headers: { accept: "application/json" },
@@ -346,23 +368,39 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
         : "border-amber-200 bg-amber-50 text-amber-900";
 
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-      <button
-        type="button"
-        onClick={handleCreateOrderClick}
-        disabled={isPending}
-        className="cursor-pointer rounded-xl border px-5 py-3 text-sm font-semibold"
-      >
-        Criar pedido
-      </button>
-      <button
-        type="button"
-        onClick={handleClick}
-        disabled={isPending}
-        className="cursor-pointer rounded-xl bg-[var(--k2-red-2)] px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {isPending ? "Emitindo NF..." : "Emitir NF"}
-      </button>
+    <div className="flex flex-col gap-3">
+      <label className="space-y-1 text-left">
+        <div className="text-sm font-semibold">Operacao fiscal</div>
+        <select
+          value={fiscalOperationCode}
+          onChange={(event) => setFiscalOperationCode(event.target.value as PedidoFiscalOperationCode)}
+          className="w-full rounded-xl border bg-[var(--card)] px-4 py-3 text-sm"
+        >
+          {PEDIDO_FISCAL_OPERATION_OPTIONS.map((option) => (
+            <option key={option.code} value={option.code}>
+              {option.label} • {option.description}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+        <button
+          type="button"
+          onClick={handleCreateOrderClick}
+          disabled={isPending}
+          className="cursor-pointer rounded-xl border px-5 py-3 text-sm font-semibold"
+        >
+          Criar pedido
+        </button>
+        <button
+          type="button"
+          onClick={handleClick}
+          disabled={isPending}
+          className="cursor-pointer rounded-xl bg-[var(--k2-red-2)] px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {isPending ? "Emitindo NF..." : "Emitir NF"}
+        </button>
+      </div>
       {notice.tone === "loading" ? (
         <div className="sm:max-w-md rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           <div className="flex items-start gap-3">

@@ -4,6 +4,8 @@ import { OrderAlreadyHasInvoiceError } from "@/fiscal/usecases/order_invoice_gua
 import { getConfiguredFocusAmbiente } from "@/fiscal/providers/focus";
 import { processFiscalJobsOnce } from "@/fiscal/worker/processor";
 import { createOrder, parseCreateOrderFormData } from "@/app/(app)/pedidos/novo/create-order";
+import { isPedidoFiscalOperationCode } from "@/fiscal/config/operation_options";
+import { getOrderPostIssueRedirect } from "@/lib/order-post-issue";
 
 async function runInlineFiscalWorker() {
   if (process.env.FISCAL_INLINE_WORKER === "0") return;
@@ -37,10 +39,13 @@ export async function POST(req: Request) {
   const input = parseCreateOrderFormData(formData);
   const orderId = createOrder(input);
   const orderPrintUrl = `/pedidos/${orderId}/imprimir`;
+  const fiscalOperationCodeRaw = formData.get("fiscalOperationCode");
+  const fiscalOperationCode = isPedidoFiscalOperationCode(fiscalOperationCodeRaw) ? fiscalOperationCodeRaw : undefined;
 
   try {
-    const issued = await issueNfeForOrder(orderId);
+    const issued = await issueNfeForOrder(orderId, { fiscalOperationCode });
     await runInlineFiscalWorker().catch((e) => console.error("inline fiscal worker failed", e));
+    const postAuthorizedRedirectTo = getOrderPostIssueRedirect(orderId);
 
     return Response.json(
       {
@@ -49,6 +54,7 @@ export async function POST(req: Request) {
         orderPrintUrl,
         invoiceId: issued.invoiceId,
         redirectTo: `/nota-fiscal?invoiceId=${encodeURIComponent(issued.invoiceId)}&autoprint=1`,
+        postAuthorizedRedirectTo,
       },
       { status: 200 }
     );
