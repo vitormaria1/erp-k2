@@ -369,20 +369,6 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
 
   return (
     <div className="flex flex-col gap-3">
-      <label className="space-y-1 text-left">
-        <div className="text-sm font-semibold">Operacao fiscal</div>
-        <select
-          value={fiscalOperationCode}
-          onChange={(event) => setFiscalOperationCode(event.target.value as PedidoFiscalOperationCode)}
-          className="w-full rounded-xl border bg-[var(--card)] px-4 py-3 text-sm"
-        >
-          {PEDIDO_FISCAL_OPERATION_OPTIONS.map((option) => (
-            <option key={option.code} value={option.code}>
-              {option.label} • {option.description}
-            </option>
-          ))}
-        </select>
-      </label>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
         <button
           type="button"
@@ -401,6 +387,20 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
           {isPending ? "Emitindo NF..." : "Emitir NF"}
         </button>
       </div>
+      <label className="space-y-1 text-left">
+        <div className="text-sm font-semibold">Operacao fiscal</div>
+        <select
+          value={fiscalOperationCode}
+          onChange={(event) => setFiscalOperationCode(event.target.value as PedidoFiscalOperationCode)}
+          className="w-full rounded-xl border bg-[var(--card)] px-4 py-3 text-sm"
+        >
+          {PEDIDO_FISCAL_OPERATION_OPTIONS.map((option) => (
+            <option key={option.code} value={option.code}>
+              {option.label} • {option.description}
+            </option>
+          ))}
+        </select>
+      </label>
       {notice.tone === "loading" ? (
         <div className="sm:max-w-md rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
           <div className="flex items-start gap-3">
