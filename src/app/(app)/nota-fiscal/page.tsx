@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { getFiscalDbPool } from "@/fiscal/infra/pg";
 import type { FiscalInvoiceListRow } from "@/fiscal/persistence/pg/dashboard_queries";
 import { formatDateTime } from "@/lib/datetime";
@@ -125,7 +126,15 @@ export default async function NotaFiscalPage(props: { searchParams?: Promise<Rec
           autoOpenDanfe={autoOpenDanfe}
         />
       ) : null}
-      <h1 className="text-2xl font-semibold">Nota Fiscal</h1>
+      <div className="mt-2 flex items-center gap-4">
+        <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-2xl border bg-white shadow-sm">
+          <Image src="/k2-logo.jpeg" alt="K2 Salgados" fill className="object-cover" priority />
+        </div>
+        <div>
+          <h1 className="text-2xl font-semibold">Nota Fiscal</h1>
+          <div className="text-sm text-[var(--muted)]">Consulta, emissão e DANFE com a identidade da empresa.</div>
+        </div>
+      </div>
 
       {error ? (
         <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
