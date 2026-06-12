@@ -1,4 +1,8 @@
 import type { FiscalDbPool } from "../../infra/pg";
+import {
+  FISCAL_OPERATION_CODE_BONIFICACAO_5910,
+  FISCAL_OPERATION_CODE_VENDA_INTERNA,
+} from "../../config/operation_options";
 import type {
   FiscalOperationRepository,
   FiscalProfileRepository,
@@ -49,9 +53,9 @@ function fallbackProductFiscalData(row: {
     cstIcms: "00",
     cstPis: "01",
     cstCofins: "01",
-    aliquotaIcms: 17,
-    aliquotaPis: 1.65,
-    aliquotaCofins: 7.6,
+    aliquotaIcms: 12,
+    aliquotaPis: 0,
+    aliquotaCofins: 0,
     cfopPadrao: "5101",
     beneficiosFiscais: [],
     tributacaoInterna: {},
@@ -220,7 +224,7 @@ export class FiscalOperationRepositoryPg implements FiscalOperationRepository {
       };
     }
 
-    if (code === "VENDA_INTERNA") {
+    if (code === FISCAL_OPERATION_CODE_VENDA_INTERNA) {
       return {
         id: "00000000-0000-0000-0000-000000000002",
         code,
@@ -232,6 +236,20 @@ export class FiscalOperationRepositoryPg implements FiscalOperationRepository {
         consumidorFinal: false,
         devolucao: false,
         bonificacao: false,
+      };
+    }
+    if (code === FISCAL_OPERATION_CODE_BONIFICACAO_5910) {
+      return {
+        id: "00000000-0000-0000-0000-000000000003",
+        code,
+        naturezaOperacao: "BONIFICACAO SIMPLES NACIONAL",
+        cfop: "5910",
+        tipoDocumento: 1,
+        finalidadeEmissao: 1,
+        localDestino: 1,
+        consumidorFinal: false,
+        devolucao: false,
+        bonificacao: true,
       };
     }
     return null;

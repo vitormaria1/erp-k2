@@ -9,10 +9,11 @@ import { extractLinhaDigitavel, extractNossoNumero } from "@/lib/sicredi-cobranc
 import { getBoletoWebhookVisualState } from "@/lib/sicredi-webhook";
 import { getFiscalDbPool } from "@/fiscal/infra/pg";
 import { getConfiguredFocusAmbiente } from "@/fiscal/providers/focus";
+import { FISCAL_OPERATION_CODE_VENDA_INTERNA } from "@/fiscal/config/operation_options";
 
 import { updateOrderStatusAction } from "./actions";
-import { IssueInvoiceButton } from "./issue-invoice-button";
 import { PedidoBoletoButton } from "./pedido-boleto-button";
+import { PedidoFiscalActions } from "./pedido-fiscal-actions";
 import { getOrderStatusMeta, normalizeOrderStatus, ORDER_STATUS_VALUES, type OrderStatus } from "./status";
 
 type Row = {
@@ -767,12 +768,6 @@ export default async function PedidosPage(props: {
                       >
                         Reimprimir
                       </Link>
-                      <form action="/api/fiscal/orders/preview-danfe" method="post">
-                        <input type="hidden" name="orderId" value={order.id} />
-                        <button className="rounded-lg border px-3 py-1.5 text-xs font-semibold">
-                          Preview DANFE
-                        </button>
-                      </form>
                       {hasActiveFiscalInvoice(order.fiscal) ? (
                         <Link
                           href={`/nota-fiscal?invoiceId=${encodeURIComponent(order.fiscal!.invoiceId)}`}
@@ -781,7 +776,7 @@ export default async function PedidosPage(props: {
                           Ver NF-e
                         </Link>
                       ) : (
-                        <IssueInvoiceButton
+                        <PedidoFiscalActions
                           orderId={order.id}
                           disabled={!order.customerAddressOk}
                           title={
@@ -790,6 +785,7 @@ export default async function PedidosPage(props: {
                               : "Cliente sem endereço completo (logradouro/número/bairro/cidade/UF/CEP)"
                           }
                           label={`Emitir NF-e (${fiscalLabel})`}
+                          defaultOperationCode={FISCAL_OPERATION_CODE_VENDA_INTERNA}
                         />
                       )}
                     </div>

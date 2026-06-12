@@ -14,8 +14,11 @@ import { issueNfe } from "./issue_nfe";
 import { buildFiscalDraftFromOrder } from "./build_draft_from_order";
 import { assertOrderHasNoActiveInvoice } from "./order_invoice_guard";
 
-export async function previewDanfeForOrder(orderId: number): Promise<{ publicPath: string }> {
-  const { draft } = await buildFiscalDraftFromOrder(orderId);
+export async function previewDanfeForOrder(
+  orderId: number,
+  opts?: { fiscalOperationCode?: string }
+): Promise<{ publicPath: string }> {
+  const { draft } = await buildFiscalDraftFromOrder(orderId, opts);
   const pool = getFiscalDbPool();
 
   const productFiscalDataRepo = new ProductFiscalDataRepositoryPg(pool);
@@ -47,9 +50,9 @@ export async function previewDanfeForOrder(orderId: number): Promise<{ publicPat
   return { publicPath: `/fiscal/previews/${name}` };
 }
 
-export async function issueNfeForOrder(orderId: number) {
+export async function issueNfeForOrder(orderId: number, opts?: { fiscalOperationCode?: string }) {
   await assertOrderHasNoActiveInvoice(orderId);
-  const { draft } = await buildFiscalDraftFromOrder(orderId);
+  const { draft } = await buildFiscalDraftFromOrder(orderId, opts);
   return issueNfe(draft, { sourceOrderId: orderId });
 }
 

@@ -9,8 +9,9 @@ import {
 } from "../../lib/payments";
 import { getIssuerConfig } from "../config/issuer";
 import { getNfeDefaults, pickNfeDefaultsByAmbiente } from "../config/nfe_defaults";
+import { isPedidoFiscalOperationCode } from "../config/operation_options";
 import { getFiscalDbPool } from "../infra/pg";
-import { ProductFiscalDataRepositoryPg } from "../persistence/pg";
+import { FiscalOperationRepositoryPg, ProductFiscalDataRepositoryPg } from "../persistence/pg";
 import { FiscalValidationError } from "../engine/errors";
 import { getConfiguredFocusAmbiente } from "../providers/focus";
 
@@ -28,6 +29,7 @@ type OrderRow = {
   createdAt: string;
   customerId: string;
   paymentMethod: OrderPaymentMethod;
+  customerCode: string | null;
 
   customerName: string;
   customerTradeName: string | null;
@@ -45,6 +47,13 @@ type OrderRow = {
   cityCode: string | null;
 };
 
+type ReceivableRow = {
+  id: string;
+  amount: number;
+  dueDate: string;
+  method: OrderPaymentMethod;
+};
+
 type ItemRow = {
   itemId: string;
   productId: string;
@@ -55,7 +64,7 @@ type ItemRow = {
   unitPrice: number;
 };
 
-function loadOrder(orderId: number): { order: OrderRow; items: ItemRow[] } {
+function loadOrder(orderId: number): { order: OrderRow; items: ItemRow[]; receivables: ReceivableRow[] } {
   const db = getDb();
   ensureOrderPaymentSchema(db);
 
@@ -68,6 +77,7 @@ function loadOrder(orderId: number): { order: OrderRow; items: ItemRow[] } {
         o.customer_id as customerId,
         o.payment_method as paymentMethod,
 
+        c.code as customerCode,
         c.name as customerName,
         c.trade_name as customerTradeName,
         c.cnpj as customerCnpj,
@@ -110,17 +120,43 @@ function loadOrder(orderId: number): { order: OrderRow; items: ItemRow[] } {
     )
     .all(orderId) as ItemRow[];
 
-  return { order, items };
+  const receivables = db
+    .prepare(
+      `
+      SELECT
+        id,
+        amount,
+        due_date as "dueDate",
+        method
+      FROM receivables
+      WHERE order_id = ?
+      ORDER BY due_date ASC, created_at ASC
+    `
+    )
+    .all(orderId) as ReceivableRow[];
+
+  return { order, items, receivables };
 }
 
-export async function buildFiscalDraftFromOrder(orderId: number) {
-  const { order, items } = loadOrder(orderId);
+export async function buildFiscalDraftFromOrder(orderId: number, opts?: { fiscalOperationCode?: string }) {
+  const { order, items, receivables } = loadOrder(orderId);
   if (!items.length) throw new Error("Pedido sem itens");
 
   const issuer = getIssuerConfig();
   const defaults = pickNfeDefaultsByAmbiente(getNfeDefaults(), getConfiguredFocusAmbiente());
   const pool = getFiscalDbPool();
   const productFiscalRepo = new ProductFiscalDataRepositoryPg(pool);
+  const fiscalOperationRepo = new FiscalOperationRepositoryPg(pool);
+  const requestedOperationCode = isPedidoFiscalOperationCode(opts?.fiscalOperationCode)
+    ? opts?.fiscalOperationCode
+    : defaults.defaultOperationCode;
+  const fiscalOperation = await fiscalOperationRepo.getByCode(requestedOperationCode);
+  if (!fiscalOperation) {
+    throw new FiscalValidationError("Operação fiscal não encontrada", {
+      orderId,
+      fiscalOperationCode: requestedOperationCode,
+    });
+  }
 
   const recipientDoc = onlyDigits(order.customerCnpj);
   if (![11, 14].includes(recipientDoc.length)) {
@@ -136,6 +172,33 @@ export async function buildFiscalDraftFromOrder(orderId: number) {
   const localDestino = recipientUf && recipientUf !== issuerUf ? 2 : 1;
 
   const nowIso = new Date().toISOString();
+  const buildApproxTaxInfo = (totalAmount: number) => {
+    const federalRate = 13.45;
+    const estadualRate = 12;
+    const federalValue = round2((totalAmount * federalRate) / 100);
+    const estadualValue = round2((totalAmount * estadualRate) / 100);
+    const customerCode = String(order.customerCode ?? "").replace(/[^\d]/g, "");
+    const codePrefix = customerCode ? `${customerCode.padStart(8, "0")} ` : "";
+    return `${codePrefix}${String(order.customerName).toUpperCase()}|Cod.Pedido(s): ${orderId}|Trib aprox. R$ Federal: ${federalValue.toFixed(2)} (${federalRate.toFixed(2)}%) Estadual: ${estadualValue.toFixed(2)} (${estadualRate.toFixed(2)}%) - Fonte:IBPT/empresometro.com.br 1C2537`;
+  };
+  const buildBillingOverrides = () => {
+    if (order.paymentMethod !== "BOLETO" || receivables.length === 0) return {};
+
+    const valorOriginal = round2(receivables.reduce((acc, receivable) => acc + Number(receivable.amount ?? 0), 0));
+    const duplicatas = receivables.map((receivable, index) => ({
+      numero: String(index + 1).padStart(3, "0"),
+      data_vencimento: String(receivable.dueDate).slice(0, 10),
+      valor: round2(Number(receivable.amount ?? 0)),
+    }));
+
+    return {
+      numero_fatura: String(orderId),
+      valor_original_fatura: valorOriginal,
+      valor_desconto_fatura: 0,
+      valor_liquido_fatura: valorOriginal,
+      duplicatas,
+    };
+  };
 
   const draftItems = [];
   let totalAmount = 0;
@@ -150,7 +213,7 @@ export async function buildFiscalDraftFromOrder(orderId: number) {
       productCode: it.productCode ?? it.productId,
       description: it.description,
       ncm: fiscalData.ncm,
-      cfop: fiscalData.cfopPadrao,
+      cfop: fiscalOperation.cfop,
       unidade: it.unit,
       quantidade: Number(it.quantity),
       valorUnitario: Number(it.unitPrice),
@@ -191,7 +254,7 @@ export async function buildFiscalDraftFromOrder(orderId: number) {
       customerId: order.customerId,
       cpfCnpj: recipientDoc,
       ie: order.customerIe ? onlyDigits(order.customerIe) : null,
-      nome: order.customerTradeName ? order.customerTradeName : order.customerName,
+      nome: order.customerName,
       endereco: {
         logradouro: order.street,
         numero: order.number,
@@ -204,9 +267,9 @@ export async function buildFiscalDraftFromOrder(orderId: number) {
       contribuinteIcms: Boolean(order.taxpayer),
     },
 
-    fiscalOperationCode: defaults.defaultOperationCode,
+    fiscalOperationCode: fiscalOperation.code,
     fiscalProfileCode: defaults.defaultProfileCode,
-    naturezaOperacao: "VENDA - PROD. INDU",
+    naturezaOperacao: fiscalOperation.naturezaOperacao,
 
     dataEmissao: nowIso,
     dataEntradaSaida: nowIso,
@@ -228,6 +291,15 @@ export async function buildFiscalDraftFromOrder(orderId: number) {
           valor_pagamento: totalAmount,
         },
       ],
+      informacoes_adicionais_contribuinte: buildApproxTaxInfo(totalAmount),
+      observacoes_contribuinte: [
+        {
+          campo: "NUM_PEDIDO",
+          texto: String(orderId),
+        },
+      ],
+      modalidade_frete: 0,
+      ...buildBillingOverrides(),
     },
   };
 
@@ -240,4 +312,8 @@ export async function buildFiscalDraftFromOrder(orderId: number) {
   }
 
   return { draft, orderId, customerId: order.customerId };
+}
+
+function round2(value: number) {
+  return Math.round(value * 100) / 100;
 }

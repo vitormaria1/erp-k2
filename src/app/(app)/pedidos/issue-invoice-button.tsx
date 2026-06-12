@@ -78,6 +78,7 @@ export function IssueInvoiceButton(props: {
   disabled: boolean;
   title: string;
   label: string;
+  fiscalOperationCode: string;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -156,6 +157,7 @@ export function IssueInvoiceButton(props: {
     popupRef.current = openDanfeTargetWindow();
     const formData = new FormData();
     formData.set("orderId", String(props.orderId));
+    formData.set("fiscalOperationCode", props.fiscalOperationCode);
 
     startTransition(async () => {
       try {

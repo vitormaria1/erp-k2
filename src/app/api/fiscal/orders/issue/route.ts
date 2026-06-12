@@ -3,6 +3,8 @@ import { OrderAlreadyHasInvoiceError } from "@/fiscal/usecases/order_invoice_gua
 import { getConfiguredFocusAmbiente } from "@/fiscal/providers/focus";
 import { processFiscalJobsOnce } from "@/fiscal/worker/processor";
 import { FiscalValidationError } from "@/fiscal/engine/errors";
+import { isPedidoFiscalOperationCode } from "@/fiscal/config/operation_options";
+import { getOrderPostIssueRedirect } from "@/lib/order-post-issue";
 
 async function runInlineFiscalWorker() {
   if (process.env.FISCAL_INLINE_WORKER === "0") return;
@@ -42,15 +44,18 @@ export async function POST(req: Request) {
     if (!Number.isFinite(orderId)) {
       return new Response("orderId inválido", { status: 400 });
     }
+    const fiscalOperationCodeRaw = form.get("fiscalOperationCode");
+    const fiscalOperationCode = isPedidoFiscalOperationCode(fiscalOperationCodeRaw) ? fiscalOperationCodeRaw : undefined;
 
-    const issued = await issueNfeForOrder(orderId);
+    const issued = await issueNfeForOrder(orderId, { fiscalOperationCode });
 
     // Process inline when enabled so the UI reflects the real status even without a dedicated worker.
     await runInlineFiscalWorker().catch((e) => console.error("inline fiscal worker failed", e));
 
     const redirectTo = `/nota-fiscal?invoiceId=${encodeURIComponent(issued.invoiceId)}`;
+    const postAuthorizedRedirectTo = getOrderPostIssueRedirect(orderId);
     if (wantsJson(req)) {
-      return Response.json({ ...issued, redirectTo }, { status: 200 });
+      return Response.json({ ...issued, redirectTo, postAuthorizedRedirectTo }, { status: 200 });
     }
     return Response.redirect(new URL(redirectTo, req.url), 303);
   } catch (e) {

@@ -2,6 +2,7 @@ import type { FiscalPayloadBuilder, ProductFiscalDataRepository } from "../../en
 import type { FiscalInvoiceDraft, TaxCalculationResult } from "../../engine/types";
 import { FiscalValidationError } from "../../engine/errors";
 import type { FiscalDbClient } from "../../infra/pg";
+import { FISCAL_OPERATION_CODE_BONIFICACAO_5910 } from "../../config/operation_options";
 import { getConfiguredFocusAmbiente } from "./config";
 
 function round2(v: number) {
@@ -62,6 +63,18 @@ function buildIbscbsFields(totalItem: number) {
   };
 }
 
+function buildBonificacao5910TaxFields() {
+  return {
+    icms_situacao_tributaria: "90",
+    ipi_situacao_tributaria: "53",
+    ipi_codigo_enquadramento_legal: "999",
+    pis_situacao_tributaria: "07",
+    cofins_situacao_tributaria: "07",
+    ibscbs_cst: "410",
+    ibscbs_codigo_classificacao_tributaria: "410001",
+  };
+}
+
 export class FocusNFePayloadBuilder implements FiscalPayloadBuilder<Record<string, unknown>> {
   constructor(private readonly deps: { productFiscalDataRepo: ProductFiscalDataRepository }) {}
 
@@ -84,8 +97,10 @@ export class FocusNFePayloadBuilder implements FiscalPayloadBuilder<Record<strin
         const icmsRate = fiscalData.aliquotaIcms ?? 0;
         const pisRate = fiscalData.aliquotaPis ?? 0;
         const cofinsRate = fiscalData.aliquotaCofins ?? 0;
+        const isBonificacao5910 =
+          draft.fiscalOperationCode === FISCAL_OPERATION_CODE_BONIFICACAO_5910 || item.cfop === "5910";
         const shouldIncludeIbscbs =
-          fiscalData.cstIcms === "00" && fiscalData.cstPis === "01" && fiscalData.cstCofins === "01";
+          !isBonificacao5910 && fiscalData.cstIcms === "00" && fiscalData.cstPis === "01" && fiscalData.cstCofins === "01";
 
         return {
           numero_item: idx + 1,
@@ -108,26 +123,27 @@ export class FocusNFePayloadBuilder implements FiscalPayloadBuilder<Record<strin
           valor_unitario_tributavel: round2(item.valorUnitario),
 
           icms_origem: fiscalData.origem,
-          icms_situacao_tributaria: fiscalData.cstIcms,
-          icms_modalidade_base_calculo: 3,
-          icms_base_calculo: round2(totalItem),
-          icms_aliquota: round2(icmsRate),
-          icms_valor: round2((totalItem * icmsRate) / 100),
+          icms_situacao_tributaria: isBonificacao5910 ? "90" : fiscalData.cstIcms,
+          icms_modalidade_base_calculo: isBonificacao5910 ? undefined : 3,
+          icms_base_calculo: isBonificacao5910 ? undefined : round2(totalItem),
+          icms_aliquota: isBonificacao5910 ? undefined : round2(icmsRate),
+          icms_valor: isBonificacao5910 ? undefined : round2((totalItem * icmsRate) / 100),
 
           // Padrão observado nos XMLs antigos para operações normais:
           // IPI não tributado com enquadramento legal 303.
-          ipi_situacao_tributaria: "52",
-          ipi_codigo_enquadramento_legal: "303",
+          ipi_situacao_tributaria: isBonificacao5910 ? "53" : "52",
+          ipi_codigo_enquadramento_legal: isBonificacao5910 ? "999" : "303",
 
-          pis_situacao_tributaria: fiscalData.cstPis,
-          pis_base_calculo: round2(totalItem),
-          pis_aliquota_porcentual: round2(pisRate),
-          pis_valor: round2((totalItem * pisRate) / 100),
+          pis_situacao_tributaria: isBonificacao5910 ? "07" : fiscalData.cstPis,
+          pis_base_calculo: isBonificacao5910 ? undefined : round2(totalItem),
+          pis_aliquota_porcentual: isBonificacao5910 ? undefined : round2(pisRate),
+          pis_valor: isBonificacao5910 ? undefined : round2((totalItem * pisRate) / 100),
 
-          cofins_situacao_tributaria: fiscalData.cstCofins,
-          cofins_base_calculo: round2(totalItem),
-          cofins_aliquota_porcentual: round2(cofinsRate),
-          cofins_valor: round2((totalItem * cofinsRate) / 100),
+          cofins_situacao_tributaria: isBonificacao5910 ? "07" : fiscalData.cstCofins,
+          cofins_base_calculo: isBonificacao5910 ? undefined : round2(totalItem),
+          cofins_aliquota_porcentual: isBonificacao5910 ? undefined : round2(cofinsRate),
+          cofins_valor: isBonificacao5910 ? undefined : round2((totalItem * cofinsRate) / 100),
+          ...(isBonificacao5910 ? buildBonificacao5910TaxFields() : {}),
           ...(shouldIncludeIbscbs ? buildIbscbsFields(totalItem) : {}),
         };
       })
