@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { getDb } from "../../lib/db";
 import {
+  BONIFICACAO_PAYMENT_METHOD,
   ensureOrderPaymentSchema,
   getFocusPaymentCode,
   getPaymentIndicator,
@@ -10,7 +11,10 @@ import {
 import { getIssuerConfig } from "../config/issuer";
 import { getNfeDefaults, pickNfeDefaultsByAmbiente } from "../config/nfe_defaults";
 import { formatOrderCode } from "@/lib/order-format";
-import { isPedidoFiscalOperationCode } from "../config/operation_options";
+import {
+  FISCAL_OPERATION_CODE_BONIFICACAO_5910,
+  isPedidoFiscalOperationCode,
+} from "../config/operation_options";
 import { getFiscalDbPool } from "../infra/pg";
 import { FiscalOperationRepositoryPg, ProductFiscalDataRepositoryPg } from "../persistence/pg";
 import { FiscalValidationError } from "../engine/errors";
@@ -148,9 +152,13 @@ export async function buildFiscalDraftFromOrder(orderId: number, opts?: { fiscal
   const pool = getFiscalDbPool();
   const productFiscalRepo = new ProductFiscalDataRepositoryPg(pool);
   const fiscalOperationRepo = new FiscalOperationRepositoryPg(pool);
+  const defaultOperationCode =
+    order.paymentMethod === BONIFICACAO_PAYMENT_METHOD
+      ? FISCAL_OPERATION_CODE_BONIFICACAO_5910
+      : defaults.defaultOperationCode;
   const requestedOperationCode = isPedidoFiscalOperationCode(opts?.fiscalOperationCode)
     ? opts?.fiscalOperationCode
-    : defaults.defaultOperationCode;
+    : defaultOperationCode;
   const fiscalOperation = await fiscalOperationRepo.getByCode(requestedOperationCode);
   if (!fiscalOperation) {
     throw new FiscalValidationError("Operação fiscal não encontrada", {
@@ -286,18 +294,34 @@ export async function buildFiscalDraftFromOrder(orderId: number, opts?: { fiscal
     // Ajustes específicos por estado/cliente podem vir por aqui, sem mexer na engine
     focusPayloadOverrides: {
       indicador_pagamento: getPaymentIndicator(order.paymentMethod),
-      formas_pagamento: [
-        {
-          forma_pagamento: getFocusPaymentCode(order.paymentMethod),
-          valor_pagamento: totalAmount,
-        },
-      ],
+      formas_pagamento:
+        order.paymentMethod === BONIFICACAO_PAYMENT_METHOD
+          ? [
+              {
+                forma_pagamento: getFocusPaymentCode(order.paymentMethod),
+                valor_pagamento: 0,
+              },
+            ]
+          : [
+              {
+                forma_pagamento: getFocusPaymentCode(order.paymentMethod),
+                valor_pagamento: totalAmount,
+              },
+            ],
       informacoes_adicionais_contribuinte: buildApproxTaxInfo(totalAmount),
       observacoes_contribuinte: [
         {
           campo: "NUM_PEDIDO",
           texto: String(orderId),
         },
+        ...(order.paymentMethod === BONIFICACAO_PAYMENT_METHOD
+          ? [
+              {
+                campo: "BONIFICACAO",
+                texto: "Pedido de bonificacao sem geracao de cobranca.",
+              },
+            ]
+          : []),
       ],
       modalidade_frete: 0,
       ...buildBillingOverrides(),

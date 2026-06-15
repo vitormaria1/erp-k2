@@ -11,6 +11,10 @@ export type ProductOpt = {
   salePriceRaw?: string | null;
 };
 export type DraftItem = { productId: string; quantity: number; unitPrice?: number };
+type LastPriceState =
+  | { status: "idle"; unitPrice: null }
+  | { status: "loading"; unitPrice: null }
+  | { status: "ready"; unitPrice: number | null };
 
 function normalize(text: string) {
   return text.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
@@ -30,13 +34,41 @@ function productDefaultPrice(product: ProductOpt) {
   return asPrice(product.price) ?? asPrice(product.salePriceRaw);
 }
 
-export function OrderItemsClient({ products, formId }: { products: ProductOpt[]; formId: string }) {
-  const [items, setItems] = React.useState<DraftItem[]>([]);
+export function OrderItemsClient({
+  products,
+  formId,
+  initialItems = [],
+}: {
+  products: ProductOpt[];
+  formId: string;
+  initialItems?: DraftItem[];
+}) {
+  const [items, setItems] = React.useState<DraftItem[]>(initialItems);
+  const [itemQuantityDrafts, setItemQuantityDrafts] = React.useState<string[]>(() =>
+    initialItems.map((item) => item.quantity.toString())
+  );
+  const [itemPriceDrafts, setItemPriceDrafts] = React.useState<string[]>(() =>
+    initialItems.map((item) => (typeof item.unitPrice === "number" ? item.unitPrice.toString() : ""))
+  );
+  const [customerId, setCustomerId] = React.useState("");
   const [productId, setProductId] = React.useState("");
   const [productQuery, setProductQuery] = React.useState("");
   const [quantity, setQuantity] = React.useState("1");
   const [unitPrice, setUnitPrice] = React.useState("");
+  const [lastPrice, setLastPrice] = React.useState<LastPriceState>({ status: "idle", unitPrice: null });
   const deferredQuery = React.useDeferredValue(productQuery);
+  const priceInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  React.useEffect(() => {
+    const form = document.getElementById(formId);
+    if (!(form instanceof HTMLFormElement)) return;
+    form.dispatchEvent(
+      new CustomEvent("order-items-change", {
+        bubbles: true,
+        detail: { itemsCount: items.length },
+      })
+    );
+  }, [formId, items]);
 
   const productMap = React.useMemo(() => {
     const map = new Map<string, ProductOpt>();
@@ -65,7 +97,14 @@ export function OrderItemsClient({ products, formId }: { products: ProductOpt[];
     setUnitPrice(defaultPrice == null ? "" : String(defaultPrice));
   }
 
-  function handleEditorKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+  function handleQuantityEditorKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    priceInputRef.current?.focus();
+    priceInputRef.current?.select();
+  }
+
+  function handlePriceEditorKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
     if (event.key !== "Enter") return;
     event.preventDefault();
     if (selectedProduct) addItem();
@@ -76,7 +115,10 @@ export function OrderItemsClient({ products, formId }: { products: ProductOpt[];
     const qty = Number(quantity);
     if (!Number.isFinite(qty) || qty <= 0) return;
     const price = unitPrice.trim().length ? Number(unitPrice) : undefined;
+    if (typeof price === "number" && (!Number.isFinite(price) || price < 0)) return;
     setItems((prev) => [...prev, { productId, quantity: qty, unitPrice: price }]);
+    setItemQuantityDrafts((prev) => [...prev, qty.toString()]);
+    setItemPriceDrafts((prev) => [...prev, typeof price === "number" ? price.toString() : ""]);
     setProductId("");
     setQuantity("1");
     setUnitPrice("");
@@ -84,9 +126,13 @@ export function OrderItemsClient({ products, formId }: { products: ProductOpt[];
 
   function removeAt(idx: number) {
     setItems((prev) => prev.filter((_, i) => i !== idx));
+    setItemQuantityDrafts((prev) => prev.filter((_, i) => i !== idx));
+    setItemPriceDrafts((prev) => prev.filter((_, i) => i !== idx));
   }
 
   function updateQuantityAt(idx: number, nextValue: string) {
+    setItemQuantityDrafts((prev) => prev.map((value, itemIdx) => (itemIdx === idx ? nextValue : value)));
+
     if (!nextValue.trim().length) return;
     const nextQuantity = Number(nextValue);
     if (!Number.isFinite(nextQuantity) || nextQuantity <= 0) return;
@@ -98,21 +144,123 @@ export function OrderItemsClient({ products, formId }: { products: ProductOpt[];
     );
   }
 
+  function finalizeQuantityAt(idx: number) {
+    setItemQuantityDrafts((prev) =>
+      prev.map((value, itemIdx) => {
+        if (itemIdx !== idx) return value;
+        const trimmed = value.trim();
+        if (!trimmed.length) return items[idx]?.quantity.toString() ?? "1";
+        const parsed = Number(trimmed);
+        if (!Number.isFinite(parsed) || parsed <= 0) return items[idx]?.quantity.toString() ?? "1";
+        return parsed.toString();
+      })
+    );
+  }
+
+  function updatePriceAt(idx: number, nextValue: string) {
+    setItemPriceDrafts((prev) => prev.map((value, itemIdx) => (itemIdx === idx ? nextValue : value)));
+
+    if (!nextValue.trim().length) {
+      setItems((prev) =>
+        prev.map((item, itemIdx) => {
+          if (itemIdx !== idx) return item;
+          return { ...item, unitPrice: undefined };
+        })
+      );
+      return;
+    }
+
+    const nextPrice = Number(nextValue);
+    if (!Number.isFinite(nextPrice) || nextPrice < 0) return;
+    setItems((prev) =>
+      prev.map((item, itemIdx) => {
+        if (itemIdx !== idx) return item;
+        return { ...item, unitPrice: nextPrice };
+      })
+    );
+  }
+
+  function finalizePriceAt(idx: number) {
+    setItemPriceDrafts((prev) =>
+      prev.map((value, itemIdx) => {
+        if (itemIdx !== idx) return value;
+        const trimmed = value.trim();
+        if (!trimmed.length) return "";
+        const parsed = Number(trimmed);
+        if (!Number.isFinite(parsed) || parsed < 0) {
+          const current = items[idx]?.unitPrice;
+          return typeof current === "number" ? current.toString() : "";
+        }
+        return parsed.toString();
+      })
+    );
+  }
+
   React.useEffect(() => {
     const form = document.getElementById(formId);
     if (!(form instanceof HTMLFormElement)) return;
 
+    const syncCustomerId = () => {
+      const input = form.elements.namedItem("customerId");
+      if (!(input instanceof HTMLInputElement)) {
+        setCustomerId("");
+        return;
+      }
+      setCustomerId(input.value);
+    };
+
+    const handleCustomerChange = () => syncCustomerId();
+
     const handleReset = () => {
-      setItems([]);
+      setItems(initialItems);
+      setItemQuantityDrafts(initialItems.map((item) => item.quantity.toString()));
+      setItemPriceDrafts(initialItems.map((item) => (typeof item.unitPrice === "number" ? item.unitPrice.toString() : "")));
+      setCustomerId("");
       setProductId("");
       setProductQuery("");
       setQuantity("1");
       setUnitPrice("");
+      setLastPrice({ status: "idle", unitPrice: null });
     };
 
+    syncCustomerId();
+    form.addEventListener("customer-selection-change", handleCustomerChange as EventListener);
     form.addEventListener("reset", handleReset);
-    return () => form.removeEventListener("reset", handleReset);
-  }, [formId]);
+    return () => {
+      form.removeEventListener("customer-selection-change", handleCustomerChange as EventListener);
+      form.removeEventListener("reset", handleReset);
+    };
+  }, [formId, initialItems]);
+
+  React.useEffect(() => {
+    if (!customerId || !productId) {
+      setLastPrice({ status: "idle", unitPrice: null });
+      return;
+    }
+
+    const controller = new AbortController();
+    const params = new URLSearchParams({ customerId, productId });
+    setLastPrice({ status: "loading", unitPrice: null });
+
+    void fetch(`/api/orders/last-price?${params.toString()}`, { signal: controller.signal })
+      .then(async (res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const payload = (await res.json()) as { unitPrice?: number | null };
+        return typeof payload.unitPrice === "number" && Number.isFinite(payload.unitPrice)
+          ? payload.unitPrice
+          : null;
+      })
+      .then((nextUnitPrice) => {
+        setLastPrice({ status: "ready", unitPrice: nextUnitPrice });
+      })
+      .catch((error: unknown) => {
+        if (controller.signal.aborted) return;
+        console.error("Falha ao buscar ultimo preco do cliente", error);
+        setLastPrice({ status: "ready", unitPrice: null });
+      });
+
+    return () => controller.abort();
+  }, [customerId, productId]);
 
   return (
     <div className="mt-3 space-y-3">
@@ -151,13 +299,24 @@ export function OrderItemsClient({ products, formId }: { products: ProductOpt[];
                       type="number"
                       min="0.001"
                       step="0.001"
-                      value={it.quantity}
+                      value={itemQuantityDrafts[idx] ?? it.quantity.toString()}
                       onChange={(e) => updateQuantityAt(idx, e.target.value)}
+                      onBlur={() => finalizeQuantityAt(idx)}
                       aria-label={`Quantidade do item ${p?.description ?? it.productId}`}
                     />
                   </td>
                   <td className="px-3 py-2">
-                    {typeof it.unitPrice === "number" ? it.unitPrice.toFixed(2) : "-"}
+                    <input
+                      className="w-28 rounded-lg border bg-[var(--card)] px-2 py-1.5 text-sm"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={itemPriceDrafts[idx] ?? (typeof it.unitPrice === "number" ? it.unitPrice.toString() : "")}
+                      onChange={(e) => updatePriceAt(idx, e.target.value)}
+                      onBlur={() => finalizePriceAt(idx)}
+                      aria-label={`Preço do item ${p?.description ?? it.productId}`}
+                      placeholder="0.00"
+                    />
                   </td>
                   <td className="px-3 py-2">
                     <button
@@ -280,22 +439,32 @@ export function OrderItemsClient({ products, formId }: { products: ProductOpt[];
                 step="0.001"
                 value={quantity}
                 onChange={(e) => setQuantity(e.target.value)}
-                onKeyDown={handleEditorKeyDown}
+                onKeyDown={handleQuantityEditorKeyDown}
                 placeholder="Qtd"
               />
             </label>
             <label className="space-y-1">
               <div className="text-xs font-semibold text-[var(--muted)]">Pre&ccedil;o unit&aacute;rio</div>
               <input
+                ref={priceInputRef}
                 className="w-full rounded-xl border bg-[var(--card)] px-3 py-2 text-sm"
                 type="number"
                 min="0"
                 step="0.01"
                 value={unitPrice}
                 onChange={(e) => setUnitPrice(e.target.value)}
-                onKeyDown={handleEditorKeyDown}
+                onKeyDown={handlePriceEditorKeyDown}
                 placeholder="R$ 0,00"
               />
+              {selectedProduct && customerId ? (
+                <div className="text-[10px] leading-tight text-[var(--muted)]">
+                  {lastPrice.status === "loading"
+                    ? "Carregando..."
+                    : lastPrice.unitPrice == null
+                      ? "Sem hist\u00f3rico"
+                      : `\u00daltimo: R$ ${lastPrice.unitPrice.toFixed(2)}`}
+                </div>
+              ) : null}
             </label>
           </div>
 

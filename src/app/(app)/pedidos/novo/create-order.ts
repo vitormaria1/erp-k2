@@ -4,10 +4,16 @@ import { z } from "zod";
 
 import { getDb } from "@/lib/db";
 import {
+  BONIFICACAO_PAYMENT_METHOD,
   buildReceivableInstallments,
   ensureOrderPaymentSchema,
   ORDER_PAYMENT_METHOD_VALUES,
 } from "@/lib/payments";
+import {
+  FISCAL_OPERATION_CODE_BONIFICACAO_5910,
+  isPedidoFiscalOperationCode,
+  type PedidoFiscalOperationCode,
+} from "@/fiscal/config/operation_options";
 
 export const itemSchema = z.object({
   productId: z.string().min(1),
@@ -22,7 +28,34 @@ export const createSchema = z.object({
   paymentMethod: z.enum(ORDER_PAYMENT_METHOD_VALUES),
   dueDate: z.string().optional(),
   installments: z.coerce.number().int().min(1).max(12).default(1),
+  fiscalOperationCode: z.string().optional(),
 });
+
+function normalizeOrderInput(args: {
+  paymentMethod: (typeof ORDER_PAYMENT_METHOD_VALUES)[number];
+  dueDate?: string;
+  installments: number;
+  fiscalOperationCode?: string;
+}) {
+  const fiscalOperationCode = isPedidoFiscalOperationCode(args.fiscalOperationCode)
+    ? (args.fiscalOperationCode as PedidoFiscalOperationCode)
+    : undefined;
+  if (fiscalOperationCode === FISCAL_OPERATION_CODE_BONIFICACAO_5910) {
+    return {
+      paymentMethod: BONIFICACAO_PAYMENT_METHOD,
+      dueDate: undefined,
+      installments: 1,
+      fiscalOperationCode,
+    };
+  }
+
+  return {
+    paymentMethod: args.paymentMethod,
+    dueDate: args.dueDate,
+    installments: args.installments,
+    fiscalOperationCode,
+  };
+}
 
 export function parseCreateOrderFormData(formData: FormData) {
   const parsed = createSchema.parse({
@@ -32,12 +65,14 @@ export function parseCreateOrderFormData(formData: FormData) {
     paymentMethod: formData.get("paymentMethod"),
     dueDate: formData.get("dueDate")?.toString(),
     installments: formData.get("installments"),
+    fiscalOperationCode: formData.get("fiscalOperationCode")?.toString(),
   });
 
   const items = z.array(itemSchema).parse(JSON.parse(parsed.itemsJson));
   if (items.length === 0) throw new Error("Inclua ao menos 1 item.");
 
-  return { ...parsed, items };
+  const normalized = normalizeOrderInput(parsed);
+  return { ...parsed, ...normalized, items };
 }
 
 export function createOrder(input: ReturnType<typeof parseCreateOrderFormData>) {

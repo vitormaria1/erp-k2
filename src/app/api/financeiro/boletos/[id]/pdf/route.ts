@@ -1,11 +1,6 @@
 import { getDb } from "@/lib/db";
 import { ensureFinancialSchema } from "@/lib/financial-ledger";
-import {
-  buildBoletoPayloadUpdate,
-  extractLinhaDigitavel,
-  extractNossoNumero,
-  SicrediCobrancaClient,
-} from "@/lib/sicredi-cobranca";
+import { getBoletoPdfBuffer } from "@/lib/boleto-pdf";
 import { isAuthenticated } from "@/lib/simple-auth";
 
 function pdfResponse(pdf: Buffer, filename: string) {
@@ -42,34 +37,20 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     return new Response("Boleto not found", { status: 404 });
   }
 
-  let parsed: unknown = null;
   try {
-    parsed = JSON.parse(boleto.payloadJson);
-  } catch {
-    return new Response("Boleto payload invalido", { status: 500 });
-  }
-
-  let linhaDigitavel = extractLinhaDigitavel(parsed);
-  if (!linhaDigitavel) {
-    const nossoNumero = extractNossoNumero(parsed);
-    if (nossoNumero) {
-      const client = new SicrediCobrancaClient();
-      const consult = await client.consultarBoleto({ nossoNumero });
-      linhaDigitavel = extractLinhaDigitavel(consult);
-
-      if (linhaDigitavel) {
-        const updatedPayload = buildBoletoPayloadUpdate(parsed, { nossoNumero, linhaDigitavel });
-        db.prepare("UPDATE boletos SET payload_json = ? WHERE id = ?").run(JSON.stringify(updatedPayload), boleto.id);
-      }
+    const pdf = await getBoletoPdfBuffer(id);
+    return pdfResponse(pdf, `boleto-${id}.pdf`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (message === "Boleto payload invalido") {
+      return new Response(message, { status: 500 });
     }
+    if (message === "Linha digitavel indisponivel para este boleto") {
+      return new Response(message, { status: 409 });
+    }
+    if (message === "Boleto not found") {
+      return new Response(message, { status: 404 });
+    }
+    throw error;
   }
-
-  if (!linhaDigitavel) {
-    return new Response("Linha digitavel indisponivel para este boleto", { status: 409 });
-  }
-
-  const client = new SicrediCobrancaClient();
-  const pdf = await client.baixarPdfPorLinhaDigitavel(linhaDigitavel);
-
-  return pdfResponse(pdf, `boleto-${id}.pdf`);
 }

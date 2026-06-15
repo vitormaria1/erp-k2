@@ -5,6 +5,7 @@ import { withPgTx } from "@/fiscal/persistence/pg/tx";
 import { getFiscalDbPool } from "@/fiscal/infra/pg";
 import { FiscalInvoiceRepositoryPg } from "@/fiscal/persistence/pg";
 import { FocusNFeClient } from "@/fiscal/providers/focus";
+import { brandDanfePdf } from "@/fiscal/pdf/danfe-branding";
 
 function filenameSafe(v: string) {
   return v.replace(/[^A-Za-z0-9._-]+/g, "_");
@@ -31,6 +32,28 @@ function pdfResponse(pdf: Buffer, filename: string) {
   });
 }
 
+function brandedPdfPath(publicPath: string) {
+  if (publicPath.endsWith("-brand.pdf")) return publicPath;
+  return publicPath.replace(/\.pdf$/i, "-brand.pdf");
+}
+
+function sourcePdfPath(publicPath: string) {
+  return publicPath.replace(/-brand\.pdf$/i, ".pdf");
+}
+
+async function ensureBrandedPdf(sourceAbsolutePath: string, sourcePublicPath: string) {
+  const brandedAbsolutePath = path.join(
+    process.cwd(),
+    "public",
+    brandedPdfPath(sourcePublicPath).replace(/^\/+/, "")
+  );
+  await brandDanfePdf(sourceAbsolutePath, brandedAbsolutePath);
+  return {
+    absolutePath: brandedAbsolutePath,
+    publicPath: brandedPdfPath(sourcePublicPath),
+  };
+}
+
 export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   const pool = getFiscalDbPool();
@@ -41,10 +64,22 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   if (!invoice) return new Response("Not found", { status: 404 });
 
   if (invoice.danfe_pdf_path) {
-    const localPath = path.join(process.cwd(), "public", invoice.danfe_pdf_path.replace(/^\/+/, ""));
-    if (await fileExists(localPath)) {
-      const filename = path.basename(localPath);
-      return pdfResponse(await readFile(localPath), filename);
+    const currentPublicPath = invoice.danfe_pdf_path;
+    const currentLocalPath = path.join(process.cwd(), "public", currentPublicPath.replace(/^\/+/, ""));
+    if (await fileExists(currentLocalPath)) {
+      const sourcePublicCandidate = sourcePdfPath(currentPublicPath);
+      const sourceLocalCandidate = path.join(process.cwd(), "public", sourcePublicCandidate.replace(/^\/+/, ""));
+      const sourceAbsolutePath = (await fileExists(sourceLocalCandidate)) ? sourceLocalCandidate : currentLocalPath;
+      const sourcePublicPath = (await fileExists(sourceLocalCandidate)) ? sourcePublicCandidate : currentPublicPath;
+      const targetPublicPath = brandedPdfPath(sourcePublicPath);
+      const targetLocalPath = path.join(process.cwd(), "public", targetPublicPath.replace(/^\/+/, ""));
+
+      const branded = await ensureBrandedPdf(sourceAbsolutePath, sourcePublicPath);
+      await withPgTx(pool, async (client) => {
+        await repo.setDanfePdfPath({ client, invoiceId: invoice.id, publicPath: branded.publicPath });
+      });
+      const responsePath = (await fileExists(targetLocalPath)) ? targetLocalPath : branded.absolutePath;
+      return pdfResponse(await readFile(responsePath), path.basename(responsePath));
     }
   }
 
@@ -62,13 +97,15 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   const outDir = path.join(process.cwd(), "public", "fiscal", "danfes");
   await mkdir(outDir, { recursive: true });
   const base = filenameSafe(invoice.chave_acesso ?? invoice.focus_ref ?? invoice.id);
-  const filename = `${base}.pdf`;
-  await writeFile(path.join(outDir, filename), dl.body);
-  const publicPath = `/fiscal/danfes/${filename}`;
+  const sourceFilename = `${base}.pdf`;
+  const sourceAbsolutePath = path.join(outDir, sourceFilename);
+  await writeFile(sourceAbsolutePath, dl.body);
+  const sourcePublicPath = `/fiscal/danfes/${sourceFilename}`;
+  const branded = await ensureBrandedPdf(sourceAbsolutePath, sourcePublicPath);
 
   await withPgTx(pool, async (client) => {
-    await repo.setDanfePdfPath({ client, invoiceId: invoice.id, publicPath });
+    await repo.setDanfePdfPath({ client, invoiceId: invoice.id, publicPath: branded.publicPath });
   });
 
-  return pdfResponse(dl.body, filename);
+  return pdfResponse(await readFile(branded.absolutePath), path.basename(branded.absolutePath));
 }

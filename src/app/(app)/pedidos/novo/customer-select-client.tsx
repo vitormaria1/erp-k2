@@ -23,6 +23,7 @@ export function CustomerSelectClient({
   inputName?: string;
   formId: string;
 }) {
+  const hiddenInputRef = React.useRef<HTMLInputElement | null>(null);
   const [query, setQuery] = React.useState("");
   const [open, setOpen] = React.useState(false);
   const [selectedId, setSelectedId] = React.useState("");
@@ -55,6 +56,17 @@ export function CustomerSelectClient({
   React.useEffect(() => {
     const form = document.getElementById(formId);
     if (!(form instanceof HTMLFormElement)) return;
+    hiddenInputRef.current?.dispatchEvent(
+      new CustomEvent("customer-selection-change", {
+        bubbles: true,
+        detail: { customerId: selectedId },
+      })
+    );
+  }, [formId, selectedId]);
+
+  React.useEffect(() => {
+    const form = document.getElementById(formId);
+    if (!(form instanceof HTMLFormElement)) return;
 
     const handleReset = () => {
       setQuery("");
@@ -68,7 +80,7 @@ export function CustomerSelectClient({
 
   return (
     <div className="relative">
-      <input type="hidden" name={inputName} value={selectedId} />
+      <input ref={hiddenInputRef} type="hidden" name={inputName} value={selectedId} />
       <input
         className="w-full rounded-xl border bg-[var(--card)] px-4 py-3 text-sm"
         placeholder="Buscar cliente por nome, fantasia, CNPJ ou código..."

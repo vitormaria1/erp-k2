@@ -5,9 +5,10 @@ type DbLike = ReturnType<typeof getDb>;
 
 let orderPaymentSchemaReady = false;
 
-export const ORDER_PAYMENT_METHOD_VALUES = ["PIX", "CASH", "BOLETO"] as const;
+export const ORDER_PAYMENT_METHOD_VALUES = ["PIX", "CASH", "BOLETO", "BONIFICACAO"] as const;
 export type OrderPaymentMethod = (typeof ORDER_PAYMENT_METHOD_VALUES)[number];
 export const BOLETO_DUE_SHORTCUT_DAYS = [7, 14, 21] as const;
+export const BONIFICACAO_PAYMENT_METHOD: OrderPaymentMethod = "BONIFICACAO";
 
 export function ensureOrderPaymentSchema(db: DbLike) {
   if (orderPaymentSchemaReady) return;
@@ -27,6 +28,8 @@ export function getOrderPaymentMethodLabel(method: string | null | undefined) {
       return "Dinheiro";
     case "BOLETO":
       return "Boleto";
+    case "BONIFICACAO":
+      return "BONIFICACAO";
     default:
       return method?.trim() || "Nao informado";
   }
@@ -37,6 +40,10 @@ export function isOrderPaymentMethod(value: string): value is OrderPaymentMethod
 }
 
 export function getDefaultReceivableDueDate(method: OrderPaymentMethod, dueDate?: string | null) {
+  if (method === BONIFICACAO_PAYMENT_METHOD) {
+    return normalizePaymentDate(getSaoPauloDateIso());
+  }
+
   if (method === "BOLETO") {
     if (dueDate?.trim()) return normalizePaymentDate(dueDate);
 
@@ -57,7 +64,9 @@ export function getRelativeDueDateInputValue(days: number) {
 }
 
 export function getPaymentIndicator(method: OrderPaymentMethod) {
-  return method === "BOLETO" ? 1 : 0;
+  if (method === "BOLETO") return 1;
+  if (method === BONIFICACAO_PAYMENT_METHOD) return 2;
+  return 0;
 }
 
 export function getFocusPaymentCode(method: OrderPaymentMethod) {
@@ -68,6 +77,8 @@ export function getFocusPaymentCode(method: OrderPaymentMethod) {
       return "15";
     case "PIX":
       return "17";
+    case "BONIFICACAO":
+      return "90";
   }
 }
 
@@ -79,6 +90,7 @@ export function buildReceivableInstallments(args: {
 }) {
   const totalAmount = Number(args.totalAmount ?? 0);
   if (!Number.isFinite(totalAmount) || totalAmount <= 0) return [];
+  if (args.method === BONIFICACAO_PAYMENT_METHOD) return [];
 
   if (args.method !== "BOLETO") {
     return [

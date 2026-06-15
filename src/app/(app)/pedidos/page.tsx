@@ -10,7 +10,10 @@ import { extractLinhaDigitavel, extractNossoNumero } from "@/lib/sicredi-cobranc
 import { getBoletoWebhookVisualState } from "@/lib/sicredi-webhook";
 import { getFiscalDbPool } from "@/fiscal/infra/pg";
 import { getConfiguredFocusAmbiente } from "@/fiscal/providers/focus";
-import { FISCAL_OPERATION_CODE_VENDA_INTERNA } from "@/fiscal/config/operation_options";
+import {
+  FISCAL_OPERATION_CODE_BONIFICACAO_5910,
+  FISCAL_OPERATION_CODE_VENDA_INTERNA,
+} from "@/fiscal/config/operation_options";
 
 import { updateOrderStatusAction } from "./actions";
 import { PedidoBoletoButton } from "./pedido-boleto-button";
@@ -763,6 +766,12 @@ export default async function PedidosPage(props: {
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <Link
+                        href={`/pedidos/${order.id}/editar`}
+                        className="rounded-lg border px-3 py-1.5 text-xs font-semibold"
+                      >
+                        Editar
+                      </Link>
+                      <Link
                         href={`/pedidos/${order.id}/imprimir`}
                         target="_blank"
                         className="rounded-lg border px-3 py-1.5 text-xs font-semibold"
@@ -786,7 +795,11 @@ export default async function PedidosPage(props: {
                               : "Cliente sem endereço completo (logradouro/número/bairro/cidade/UF/CEP)"
                           }
                           label={`Emitir NF-e (${fiscalLabel})`}
-                          defaultOperationCode={FISCAL_OPERATION_CODE_VENDA_INTERNA}
+                          defaultOperationCode={
+                            order.paymentMethod === "BONIFICACAO"
+                              ? FISCAL_OPERATION_CODE_BONIFICACAO_5910
+                              : FISCAL_OPERATION_CODE_VENDA_INTERNA
+                          }
                         />
                       )}
                     </div>

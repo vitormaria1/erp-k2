@@ -89,7 +89,7 @@ export default async function PrintCarregamentoPage({
 
   return (
     <div
-      id="print-fit-shell"
+      data-print-shell
       className="loading-print-shell mx-auto w-full max-w-[210mm] p-3 print:w-[190mm] print:p-0"
     >
       <PrintOnLoad />

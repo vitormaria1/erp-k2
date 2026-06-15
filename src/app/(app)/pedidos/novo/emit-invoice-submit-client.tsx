@@ -13,6 +13,11 @@ type Props = {
   formId: string;
 };
 
+type OrderGuardState = {
+  hasCustomer: boolean;
+  hasItems: boolean;
+};
+
 type IssueResponse = {
   ok: boolean;
   orderId?: number;
@@ -42,8 +47,43 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function getFinalDocumentUrl(invoiceId: string, withBoleto: boolean) {
+  return withBoleto
+    ? `/api/fiscal/invoices/${encodeURIComponent(invoiceId)}/documents`
+    : `/api/fiscal/invoices/${encodeURIComponent(invoiceId)}/danfe`;
+}
+
 function resetOrderForm(form: HTMLFormElement) {
   form.reset();
+}
+
+function readOrderGuardState(form: HTMLFormElement): OrderGuardState {
+  const customerInput = form.elements.namedItem("customerId");
+  const itemsInput = form.elements.namedItem("itemsJson");
+
+  const hasCustomer = customerInput instanceof HTMLInputElement && customerInput.value.trim().length > 0;
+
+  let hasItems = false;
+  if (itemsInput instanceof HTMLInputElement) {
+    try {
+      const parsed = JSON.parse(itemsInput.value);
+      hasItems = Array.isArray(parsed) && parsed.length > 0;
+    } catch {
+      hasItems = false;
+    }
+  }
+
+  return { hasCustomer, hasItems };
+}
+
+function getMissingRequirementsMessage(state: OrderGuardState, actionLabel: string) {
+  if (!state.hasCustomer && !state.hasItems) {
+    return `Antes de ${actionLabel}, selecione o cliente e adicione pelo menos um produto ao orçamento.`;
+  }
+  if (!state.hasCustomer) {
+    return `Antes de ${actionLabel}, selecione o cliente do orçamento.`;
+  }
+  return `Antes de ${actionLabel}, adicione pelo menos um produto ao orçamento.`;
 }
 
 export function EmitInvoiceSubmitClient({ formId }: Props) {
@@ -51,6 +91,7 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
   const [fiscalOperationCode, setFiscalOperationCode] = useState<PedidoFiscalOperationCode>(
     FISCAL_OPERATION_CODE_VENDA_INTERNA
   );
+  const [guardState, setGuardState] = useState<OrderGuardState>({ hasCustomer: false, hasItems: false });
   const [notice, setNotice] = useState<{
     tone: "idle" | "loading" | "success" | "error";
     text: string;
@@ -75,13 +116,31 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
     const form = document.getElementById(formId);
     if (!(form instanceof HTMLFormElement)) return;
 
-    const handleReset = () => {
-      setFiscalOperationCode(FISCAL_OPERATION_CODE_VENDA_INTERNA);
+    const syncGuardState = () => {
+      setGuardState(readOrderGuardState(form));
     };
 
+    const handleReset = () => {
+      setFiscalOperationCode(FISCAL_OPERATION_CODE_VENDA_INTERNA);
+      syncGuardState();
+    };
+
+    syncGuardState();
+    form.addEventListener("customer-selection-change", syncGuardState as EventListener);
+    form.addEventListener("order-items-change", syncGuardState as EventListener);
+    form.addEventListener("input", syncGuardState);
+    form.addEventListener("change", syncGuardState);
     form.addEventListener("reset", handleReset);
-    return () => form.removeEventListener("reset", handleReset);
+    return () => {
+      form.removeEventListener("customer-selection-change", syncGuardState as EventListener);
+      form.removeEventListener("order-items-change", syncGuardState as EventListener);
+      form.removeEventListener("input", syncGuardState);
+      form.removeEventListener("change", syncGuardState);
+      form.removeEventListener("reset", handleReset);
+    };
   }, [formId]);
+
+  const canSubmitOrder = guardState.hasCustomer && guardState.hasItems;
 
   function openDanfeTargetWindow() {
     const popup = window.open("", "_blank");
@@ -92,7 +151,7 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Preparando DANFE</title>
+    <title>Preparando documentos</title>
     <style>
       :root {
         color-scheme: light;
@@ -145,8 +204,8 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
   <body>
     <div class="card">
       <div class="spinner"></div>
-      <h1>Preparando DANFE</h1>
-      <p>A nota est&aacute; sendo emitida. Esta guia ser&aacute; atualizada automaticamente quando a DANFE estiver pronta.</p>
+      <h1>Preparando documentos</h1>
+      <p>A nota est&aacute; sendo emitida. Esta guia ser&aacute; atualizada automaticamente quando os documentos estiverem prontos.</p>
     </div>
   </body>
 </html>`);
@@ -155,7 +214,7 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
   }
 
   async function waitForDanfe(invoiceId: string, redirectTo?: string, postAuthorizedRedirectTo?: string) {
-    const finalDanfeUrl = `/api/fiscal/invoices/${encodeURIComponent(invoiceId)}/danfe`;
+    const finalDocumentUrl = getFinalDocumentUrl(invoiceId, Boolean(postAuthorizedRedirectTo));
     const maxAttempts = 30;
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -172,15 +231,15 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
 
         if (status === "AUTHORIZED") {
           if (popupRef.current && !popupRef.current.closed) {
-            popupRef.current.location.href = finalDanfeUrl;
+            popupRef.current.location.href = finalDocumentUrl;
           }
 
           if (postAuthorizedRedirectTo) {
             setNotice((prev) => ({
               tone: "success",
-              text: "NF autorizada. A DANFE foi aberta na outra guia e a cobrança foi liberada na tela de orçamentos.",
+              text: "NF autorizada. A DANFE e o boleto foram abertos juntos na outra guia.",
               orderPrintUrl: prev.orderPrintUrl,
-              danfeUrl: finalDanfeUrl,
+              danfeUrl: finalDocumentUrl,
               ordersUrl: prev.ordersUrl,
             }));
           } else {
@@ -189,9 +248,9 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
               text:
                 popupRef.current && !popupRef.current.closed
                   ? "NF autorizada. A DANFE foi aberta na outra guia."
-                  : "NF autorizada. A guia foi fechada; clique abaixo para abrir a DANFE.",
+                  : "NF autorizada. A guia foi fechada; clique abaixo para abrir o documento.",
               orderPrintUrl: prev.orderPrintUrl,
-              danfeUrl: finalDanfeUrl,
+              danfeUrl: finalDocumentUrl,
               ordersUrl: prev.ordersUrl,
             }));
           }
@@ -238,6 +297,13 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
   function handleClick() {
     const form = document.getElementById(formId);
     if (!(form instanceof HTMLFormElement)) return;
+    if (!canSubmitOrder) {
+      setNotice({
+        tone: "error",
+        text: getMissingRequirementsMessage(guardState, "emitir a NF e gerar o boleto"),
+      });
+      return;
+    }
     if (!form.reportValidity()) return;
 
     popupRef.current = openDanfeTargetWindow();
@@ -273,7 +339,7 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
           if (payload.invoiceId) {
             setNotice({
               tone: "loading",
-              text: `Orçamento ${formatOrderCode(payload.orderId)} criado. Aguardando autorização da NF para liberar ${payload.postAuthorizedRedirectTo ? "a cobrança em Orçamentos" : "a DANFE"}...`,
+              text: `Orçamento ${formatOrderCode(payload.orderId)} criado. Aguardando autorização da NF para liberar ${payload.postAuthorizedRedirectTo ? "a DANFE e o boleto" : "a DANFE"}...`,
               orderPrintUrl: payload.orderPrintUrl,
               danfeUrl: undefined,
               ordersUrl: payload.orderId ? `/pedidos?period=today&q=${formatOrderCode(payload.orderId)}` : "/pedidos?period=today",
@@ -309,6 +375,13 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
   function handleCreateOrderClick() {
     const form = document.getElementById(formId);
     if (!(form instanceof HTMLFormElement)) return;
+    if (!canSubmitOrder) {
+      setNotice({
+        tone: "error",
+        text: getMissingRequirementsMessage(guardState, "criar o orçamento"),
+      });
+      return;
+    }
     if (!form.reportValidity()) return;
 
     const popup = window.open("", "_blank");
@@ -375,7 +448,15 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
           type="button"
           onClick={handleCreateOrderClick}
           disabled={isPending}
-          className="cursor-pointer rounded-xl border px-5 py-3 text-sm font-semibold"
+          aria-disabled={!canSubmitOrder}
+          className={[
+            "rounded-xl border px-5 py-3 text-sm font-semibold transition",
+            isPending
+              ? "cursor-not-allowed opacity-60"
+              : canSubmitOrder
+                ? "cursor-pointer"
+                : "cursor-not-allowed border-black/10 bg-black/[0.04] text-[var(--muted)]",
+          ].join(" ")}
         >
           Criar orçamento
         </button>
@@ -383,14 +464,28 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
           type="button"
           onClick={handleClick}
           disabled={isPending}
-          className="cursor-pointer rounded-xl bg-[var(--k2-red-2)] px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+          aria-disabled={!canSubmitOrder}
+          className={[
+            "rounded-xl px-5 py-3 text-sm font-semibold transition",
+            isPending
+              ? "cursor-not-allowed bg-[var(--k2-red-2)] text-white opacity-50"
+              : canSubmitOrder
+                ? "cursor-pointer bg-[var(--k2-red-2)] text-white"
+                : "cursor-not-allowed bg-[var(--k2-red-2)]/40 text-white",
+          ].join(" ")}
         >
           {isPending ? "Emitindo NF..." : "Emitir NF"}
         </button>
       </div>
+      {!canSubmitOrder ? (
+        <div className="text-sm text-[var(--muted)]">
+          Selecione o cliente e adicione pelo menos um produto para liberar a criação do orçamento e a emissão da NF.
+        </div>
+      ) : null}
       <label className="space-y-1 text-left">
         <div className="text-sm font-semibold">Operacao fiscal</div>
         <select
+          name="fiscalOperationCode"
           value={fiscalOperationCode}
           onChange={(event) => setFiscalOperationCode(event.target.value as PedidoFiscalOperationCode)}
           className="w-full rounded-xl border bg-[var(--card)] px-4 py-3 text-sm"

@@ -3,23 +3,35 @@
 import * as React from "react";
 
 function fitPrintablePage() {
-  const shell = document.getElementById("print-fit-shell");
-  const content = shell?.querySelector<HTMLElement>("[data-print-content]");
-  const slot = shell?.querySelector<HTMLElement>(".print-copy-slot");
-  if (!shell || !content || !slot) return;
+  const shells = Array.from(document.querySelectorAll<HTMLElement>("[data-print-shell]"));
+  if (!shells.length) return;
 
-  shell.style.setProperty("--print-scale", "1");
+  for (const shell of shells) {
+    shell.style.setProperty("--print-scale", "1");
 
-  const slotRect = slot.getBoundingClientRect();
-  const contentRect = content.getBoundingClientRect();
-  if (!slotRect.width || !slotRect.height || !contentRect.width || !contentRect.height) return;
+    const slots = Array.from(shell.querySelectorAll<HTMLElement>(".print-copy-slot"));
+    const contents = Array.from(shell.querySelectorAll<HTMLElement>("[data-print-content]"));
+    if (!slots.length || !contents.length) continue;
 
-  const availableHeight = slotRect.height;
-  const widthScale = slotRect.width / contentRect.width;
-  const heightScale = availableHeight / contentRect.height;
-  const scale = Math.min(1, widthScale, heightScale);
+    let scale = 1;
+    const pairCount = Math.min(slots.length, contents.length);
 
-  shell.style.setProperty("--print-scale", String(scale));
+    for (let index = 0; index < pairCount; index += 1) {
+      const slot = slots[index];
+      const content = contents[index];
+      const availableWidth = slot.clientWidth;
+      const availableHeight = slot.clientHeight;
+      const contentWidth = content.scrollWidth;
+      const contentHeight = content.scrollHeight;
+      if (!availableWidth || !availableHeight || !contentWidth || !contentHeight) continue;
+
+      const widthScale = availableWidth / contentWidth;
+      const heightScale = availableHeight / contentHeight;
+      scale = Math.min(scale, widthScale, heightScale);
+    }
+
+    shell.style.setProperty("--print-scale", String(scale));
+  }
 }
 
 export function PrintOnLoad() {

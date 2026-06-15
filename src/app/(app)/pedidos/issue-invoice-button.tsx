@@ -15,6 +15,12 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function getFinalDocumentUrl(invoiceId: string, withBoleto: boolean) {
+  return withBoleto
+    ? `/api/fiscal/invoices/${encodeURIComponent(invoiceId)}/documents`
+    : `/api/fiscal/invoices/${encodeURIComponent(invoiceId)}/danfe`;
+}
+
 function openDanfeTargetWindow() {
   const popup = window.open("", "_blank");
   if (!popup) return null;
@@ -24,7 +30,7 @@ function openDanfeTargetWindow() {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Preparando DANFE</title>
+    <title>Preparando documentos</title>
     <style>
       :root { color-scheme: light; }
       * { box-sizing: border-box; }
@@ -65,8 +71,8 @@ function openDanfeTargetWindow() {
   <body>
     <div class="card">
       <div class="spinner"></div>
-      <h1>Preparando DANFE</h1>
-      <p>A nota est&aacute; sendo emitida. Esta guia ser&aacute; atualizada automaticamente quando a DANFE estiver pronta.</p>
+      <h1>Preparando documentos</h1>
+      <p>A nota est&aacute; sendo emitida. Esta guia ser&aacute; atualizada automaticamente quando os documentos estiverem prontos.</p>
     </div>
   </body>
 </html>`);
@@ -95,7 +101,7 @@ export function IssueInvoiceButton(props: {
   }, []);
 
   async function waitForDanfe(invoiceId: string, redirectTo: string, postAuthorizedRedirectTo?: string) {
-    const finalDanfeUrl = `/api/fiscal/invoices/${encodeURIComponent(invoiceId)}/danfe`;
+    const finalDocumentUrl = getFinalDocumentUrl(invoiceId, Boolean(postAuthorizedRedirectTo));
     const maxAttempts = 30;
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -112,14 +118,14 @@ export function IssueInvoiceButton(props: {
 
         if (status === "AUTHORIZED") {
           if (popupRef.current && !popupRef.current.closed) {
-            popupRef.current.location.href = finalDanfeUrl;
+            popupRef.current.location.href = finalDocumentUrl;
           } else if (!postAuthorizedRedirectTo) {
             router.push(`${redirectTo}${redirectTo.includes("?") ? "&" : "?"}autoprint=1`);
           }
 
           if (postAuthorizedRedirectTo) {
             router.refresh();
-            setError(`NF autorizada. Gere o boleto na coluna de cobrança deste orçamento ${formatOrderCode(props.orderId)}.`);
+            setError(null);
           } else {
             setError(null);
           }

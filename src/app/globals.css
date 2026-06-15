@@ -75,6 +75,26 @@ body {
   animation-delay: -8s;
 }
 
+.loading-print-shell {
+  width: 198mm;
+  min-height: 285mm;
+  overflow: hidden;
+  margin: 0 auto;
+  padding: 0;
+  --print-scale: 1;
+}
+
+.loading-print-content {
+  width: calc(100% / var(--print-scale));
+  transform: scale(var(--print-scale));
+  transform-origin: top left;
+}
+
+.print-copy-slot {
+  height: 100%;
+  break-inside: avoid;
+}
+
 @keyframes loginFloat {
   0%,
   100% {
@@ -109,20 +129,7 @@ body {
   .loading-print-shell {
     width: 198mm !important;
     height: 285mm;
-    overflow: hidden;
-    margin: 0 auto;
+    min-height: 285mm;
     padding: 0 !important;
-    --print-scale: 1;
-  }
-
-  .loading-print-content {
-    width: calc(100% / var(--print-scale));
-    transform: scale(var(--print-scale));
-    transform-origin: top left;
-  }
-
-  .print-copy-slot {
-    height: 100%;
-    break-inside: avoid;
   }
 }

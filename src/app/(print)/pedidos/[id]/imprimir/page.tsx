@@ -6,7 +6,11 @@ import { ensureCustomerSchema } from "@/lib/customer-schema";
 import { getDb } from "@/lib/db";
 import { formatDateTime } from "@/lib/datetime";
 import { formatOrderCode } from "@/lib/order-format";
-import { ensureOrderPaymentSchema, getOrderPaymentMethodLabel } from "@/lib/payments";
+import {
+  BONIFICACAO_PAYMENT_METHOD,
+  ensureOrderPaymentSchema,
+  getOrderPaymentMethodLabel,
+} from "@/lib/payments";
 
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -44,6 +48,7 @@ type OrderPrintCopyProps = {
   total: string;
   created: string;
   customerAddress: string[];
+  autoNotes: string[];
 };
 
 function formatCustomerAddress(order: PrintableOrder) {
@@ -110,7 +115,18 @@ function getOrderPrintable(orderId: number) {
   return { order, items, grandTotal };
 }
 
-function OrderPrintCopy({ order, items, total, created, customerAddress }: OrderPrintCopyProps) {
+function OrderPrintCopy({ order, items, total, created, customerAddress, autoNotes }: OrderPrintCopyProps) {
+  const shouldCompactItems = items.length > 11;
+  const shouldCompactItemsStrongly = items.length > 15;
+  const tableClassName = shouldCompactItemsStrongly
+    ? "w-full table-fixed text-[9px] leading-tight"
+    : shouldCompactItems
+      ? "w-full table-fixed text-[10px] leading-tight"
+      : "w-full table-fixed text-[11px] leading-tight";
+  const headerCellClassName = shouldCompactItems ? "px-2 py-1" : "px-2 py-1.5";
+  const bodyCellClassName = shouldCompactItemsStrongly ? "px-2 py-0.5" : shouldCompactItems ? "px-2 py-[3px]" : "px-2 py-1";
+  const productNameClassName = shouldCompactItems ? "truncate leading-tight" : "truncate";
+
   return (
     <div data-print-content className="loading-print-content rounded-xl bg-white">
       <div className="flex items-start justify-between border-b pb-2">
@@ -165,36 +181,43 @@ function OrderPrintCopy({ order, items, total, created, customerAddress }: Order
         </div>
       </div>
 
-      {order.notes ? (
+      {autoNotes.length > 0 || order.notes ? (
         <div className="mt-2 rounded-xl border p-2">
           <div className="text-[10px] font-semibold uppercase tracking-wide text-black/60">Observações</div>
-          <div className="mt-0.5 text-[11px] leading-tight">{order.notes}</div>
+          <div className="mt-0.5 space-y-1 text-[11px] leading-tight">
+            {autoNotes.map((note) => (
+              <div key={note} className="font-semibold">
+                {note}
+              </div>
+            ))}
+            {order.notes ? <div>{order.notes}</div> : null}
+          </div>
         </div>
       ) : null}
 
       <div className="mt-2 overflow-hidden rounded-xl border">
-        <table className="w-full table-fixed text-[11px] leading-tight">
+        <table className={tableClassName}>
           <thead className="bg-black/[0.03] text-left">
             <tr>
-              <th className="w-[68px] px-2 py-1.5">Código</th>
-              <th className="px-2 py-1.5">Produto</th>
-              <th className="w-[42px] px-2 py-1.5">Un.</th>
-              <th className="w-[68px] px-2 py-1.5 text-right">Qtd</th>
-              <th className="w-[92px] px-2 py-1.5 text-right">Vlr. unit.</th>
-              <th className="w-[92px] px-2 py-1.5 text-right">Total</th>
+              <th className={`w-[68px] ${headerCellClassName}`}>Código</th>
+              <th className={headerCellClassName}>Produto</th>
+              <th className={`w-[42px] ${headerCellClassName}`}>Un.</th>
+              <th className={`w-[68px] ${headerCellClassName} text-right`}>Qtd</th>
+              <th className={`w-[92px] ${headerCellClassName} text-right`}>Vlr. unit.</th>
+              <th className={`w-[92px] ${headerCellClassName} text-right`}>Total</th>
             </tr>
           </thead>
           <tbody>
             {items.map((it) => (
               <tr key={`${it.code}-${it.name}`} className="border-t">
-                <td className="px-2 py-1 font-semibold">{it.code}</td>
-                <td className="px-2 py-1">
-                  <div className="truncate">{it.name}</div>
+                <td className={`${bodyCellClassName} font-semibold`}>{it.code}</td>
+                <td className={bodyCellClassName}>
+                  <div className={productNameClassName}>{it.name}</div>
                 </td>
-                <td className="px-2 py-1">{it.unit || "-"}</td>
-                <td className="px-2 py-1 text-right">{Number(it.quantity).toFixed(3)}</td>
-                <td className="px-2 py-1 text-right">{money.format(Number(it.unitPrice))}</td>
-                <td className="px-2 py-1 text-right font-semibold">{money.format(Number(it.total))}</td>
+                <td className={bodyCellClassName}>{it.unit || "-"}</td>
+                <td className={`${bodyCellClassName} text-right`}>{Number(it.quantity).toFixed(3)}</td>
+                <td className={`${bodyCellClassName} text-right`}>{money.format(Number(it.unitPrice))}</td>
+                <td className={`${bodyCellClassName} text-right font-semibold`}>{money.format(Number(it.total))}</td>
               </tr>
             ))}
             {items.length === 0 ? (
@@ -231,14 +254,16 @@ export default async function PrintPedidoPage({
   const created = formatDateTime(order.createdAt);
   const customerAddress = formatCustomerAddress(order);
   const total = money.format(grandTotal);
+  const autoNotes =
+    order.paymentMethod === BONIFICACAO_PAYMENT_METHOD
+      ? ["BONIFICACAO: pedido sem cobranca e sem geracao de recebivel."]
+      : [];
 
   return (
     <>
       <div
-        id="print-fit-shell"
-        data-print-copies="2"
-        data-print-gap="8"
-        className="loading-print-shell mx-auto grid w-full max-w-[210mm] grid-rows-2 gap-2 p-3 print:w-[190mm] print:p-0"
+        data-print-shell
+        className="loading-print-shell mx-auto grid h-[285mm] w-full max-w-[210mm] grid-rows-2 gap-2 p-3 print:h-[285mm] print:w-[190mm] print:p-0"
       >
         <PrintOnLoad />
         <div className="print-copy-slot overflow-hidden rounded-xl border border-dashed border-black/30 p-2">
@@ -248,6 +273,7 @@ export default async function PrintPedidoPage({
             total={total}
             created={created}
             customerAddress={customerAddress}
+            autoNotes={autoNotes}
           />
         </div>
         <div className="print-copy-slot overflow-hidden rounded-xl border border-dashed border-black/30 p-2">
@@ -257,6 +283,7 @@ export default async function PrintPedidoPage({
             total={total}
             created={created}
             customerAddress={customerAddress}
+            autoNotes={autoNotes}
           />
         </div>
       </div>

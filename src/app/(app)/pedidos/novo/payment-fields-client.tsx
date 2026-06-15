@@ -3,35 +3,83 @@
 import * as React from "react";
 
 import {
+  BONIFICACAO_PAYMENT_METHOD,
   BOLETO_DUE_SHORTCUT_DAYS,
   getRelativeDueDateInputValue,
   type OrderPaymentMethod,
 } from "@/lib/payments";
+import { FISCAL_OPERATION_CODE_BONIFICACAO_5910 } from "@/fiscal/config/operation_options";
 
 type Props = {
   formId: string;
+  initialPaymentMethod?: OrderPaymentMethod;
+  initialDueDate?: string;
+  initialInstallments?: number;
 };
 
 const DEFAULT_PAYMENT_METHOD: OrderPaymentMethod = "PIX";
 
-export function PaymentFieldsClient({ formId }: Props) {
-  const [paymentMethod, setPaymentMethod] = React.useState<OrderPaymentMethod>(DEFAULT_PAYMENT_METHOD);
-  const [dueDate, setDueDate] = React.useState(getRelativeDueDateInputValue(7));
-  const [installments, setInstallments] = React.useState("1");
+export function PaymentFieldsClient({
+  formId,
+  initialPaymentMethod = DEFAULT_PAYMENT_METHOD,
+  initialDueDate = getRelativeDueDateInputValue(7),
+  initialInstallments = 1,
+}: Props) {
+  const [paymentMethod, setPaymentMethod] = React.useState<OrderPaymentMethod>(initialPaymentMethod);
+  const [dueDate, setDueDate] = React.useState(initialDueDate);
+  const [installments, setInstallments] = React.useState(String(initialInstallments));
+  const [isBonificacaoMode, setIsBonificacaoMode] = React.useState(
+    initialPaymentMethod === BONIFICACAO_PAYMENT_METHOD
+  );
 
   React.useEffect(() => {
     const form = document.getElementById(formId);
     if (!(form instanceof HTMLFormElement)) return;
 
-    const handleReset = () => {
-      setPaymentMethod(DEFAULT_PAYMENT_METHOD);
-      setDueDate(getRelativeDueDateInputValue(7));
-      setInstallments("1");
+    const syncFiscalOperation = () => {
+      const input = form.elements.namedItem("fiscalOperationCode");
+      const isBonificacao =
+        input instanceof HTMLSelectElement || input instanceof HTMLInputElement
+          ? input.value === FISCAL_OPERATION_CODE_BONIFICACAO_5910
+          : false;
+      setIsBonificacaoMode(initialPaymentMethod === BONIFICACAO_PAYMENT_METHOD || isBonificacao);
     };
 
+    const handleReset = () => {
+      setPaymentMethod(initialPaymentMethod);
+      setDueDate(initialDueDate);
+      setInstallments(String(initialInstallments));
+      setIsBonificacaoMode(initialPaymentMethod === BONIFICACAO_PAYMENT_METHOD);
+    };
+
+    syncFiscalOperation();
+    form.addEventListener("input", syncFiscalOperation);
+    form.addEventListener("change", syncFiscalOperation);
     form.addEventListener("reset", handleReset);
-    return () => form.removeEventListener("reset", handleReset);
-  }, [formId]);
+    return () => {
+      form.removeEventListener("input", syncFiscalOperation);
+      form.removeEventListener("change", syncFiscalOperation);
+      form.removeEventListener("reset", handleReset);
+    };
+  }, [formId, initialDueDate, initialInstallments, initialPaymentMethod]);
+
+  if (isBonificacaoMode) {
+    return (
+      <>
+        <input type="hidden" name="paymentMethod" value={BONIFICACAO_PAYMENT_METHOD} />
+        <input type="hidden" name="installments" value="1" />
+        <label className="space-y-1">
+          <div className="text-sm font-semibold">Recebimento</div>
+          <div className="rounded-xl border bg-black/[0.03] px-4 py-3 text-sm font-semibold">
+            BONIFICACAO
+          </div>
+          <div className="text-xs text-[var(--muted)]">
+            Pedidos de bonificação não geram recebíveis nem boleto no financeiro.
+          </div>
+        </label>
+      </>
+    );
+  }
 
   return (
     <>
