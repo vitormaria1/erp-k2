@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "ERP K2 Salgados",
-  description: "ERP para pedidos, estoque, financeiro e relatórios da K2 Salgados.",
+  description: "ERP para orçamentos, estoque, financeiro e relatórios da K2 Salgados.",
 };
 
 export default function RootLayout({

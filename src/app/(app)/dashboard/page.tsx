@@ -32,7 +32,7 @@ export default function DashboardPage() {
       <Topbar />
 
       <section className="grid grid-cols-1 gap-4 px-6 md:grid-cols-2 lg:grid-cols-5">
-        <StatCard label="Pedidos hoje" value={String(metrics.ordersToday)} sub="Atualizado agora" />
+        <StatCard label="Orçamentos hoje" value={String(metrics.ordersToday)} sub="Atualizado agora" />
         <StatCard label="Notas emitidas" value={String(metrics.invoicesToday)} sub="Hoje" />
         <StatCard label="Itens em estoque" value={String(metrics.productsCount)} sub="Cadastros" />
         <StatCard

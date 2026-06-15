@@ -58,14 +58,14 @@ export default function CarregamentosPage() {
         <div>
           <h1 className="text-2xl font-semibold">Carregamentos</h1>
           <div className="text-sm text-[var(--muted)]">
-            Agrupa pedidos selecionados para montar a carga.
+            Agrupa orçamentos selecionados para montar a carga.
           </div>
         </div>
         <Link
           href="#selecionar"
           className="rounded-xl border bg-[var(--card)] px-4 py-3 text-sm font-semibold"
         >
-          Selecionar pedidos
+          Selecionar orçamentos
         </Link>
       </div>
 
@@ -78,7 +78,7 @@ export default function CarregamentosPage() {
           <thead className="bg-black/[0.02] text-left text-[var(--muted)]">
             <tr>
               <th className="px-4 py-3">Criado em</th>
-              <th className="px-4 py-3">Pedidos</th>
+              <th className="px-4 py-3">Orçamentos</th>
               <th className="px-4 py-3">Obs.</th>
               <th className="px-4 py-3">Ações</th>
             </tr>
@@ -102,7 +102,7 @@ export default function CarregamentosPage() {
             {rows.length === 0 ? (
               <tr>
                 <td className="px-4 py-8 text-[var(--muted)]" colSpan={4}>
-                  Nenhum carregamento ainda. Selecione pedidos acima para criar.
+                  Nenhum carregamento ainda. Selecione orçamentos acima para criar.
                 </td>
               </tr>
             ) : null}

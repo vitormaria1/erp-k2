@@ -5,6 +5,7 @@ import { PrintButtons, PrintOnLoad } from "./print-client";
 import { ensureCustomerSchema } from "@/lib/customer-schema";
 import { getDb } from "@/lib/db";
 import { formatDateTime } from "@/lib/datetime";
+import { formatOrderCode } from "@/lib/order-format";
 import { ensureOrderPaymentSchema, getOrderPaymentMethodLabel } from "@/lib/payments";
 
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -116,13 +117,15 @@ function OrderPrintCopy({ order, items, total, created, customerAddress }: Order
         <div className="flex items-center gap-3">
           <Image src="/k2-logo.jpeg" alt="K2 Salgados" width={52} height={52} priority />
           <div>
-            <div className="text-lg font-extrabold tracking-tight">K2 Salgados</div>
-            <div className="text-[11px] text-black/70">Indústria e Distribuição de Congelados</div>
+            <div className="text-base font-extrabold tracking-tight">
+              K2 INDUSTRIA E COMERCIO DE ALIMENTOS LTDA
+            </div>
+            <div className="text-[11px] text-black/70">Garopaba SC</div>
           </div>
         </div>
         <div className="text-right">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-black/60">Pedido</div>
-          <div className="text-xl font-extrabold leading-none">#{order.id}</div>
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-black/60">Orçamento</div>
+          <div className="text-xl font-extrabold leading-none">{formatOrderCode(order.id)}</div>
           <div className="mt-1 text-[11px] text-black/60">{created}</div>
         </div>
       </div>
@@ -131,10 +134,10 @@ function OrderPrintCopy({ order, items, total, created, customerAddress }: Order
         <div className="min-w-0">
           <div className="text-[10px] font-semibold uppercase tracking-wide text-black/60">Cliente</div>
           <div className="truncate text-sm font-bold">
-            {order.customerTradeName ? order.customerTradeName : order.customerName}
+            {order.customerName}
           </div>
           {order.customerTradeName ? (
-            <div className="truncate text-[11px] text-black/70">{order.customerName}</div>
+            <div className="truncate text-[11px] text-black/70">{order.customerTradeName}</div>
           ) : null}
           {order.customerCnpj ? <div className="text-[11px] text-black/70">{order.customerCnpj}</div> : null}
         </div>
@@ -197,7 +200,7 @@ function OrderPrintCopy({ order, items, total, created, customerAddress }: Order
             {items.length === 0 ? (
               <tr>
                 <td className="px-2 py-4 text-black/60" colSpan={6}>
-                  Pedido sem itens.
+                  Orçamento sem itens.
                 </td>
               </tr>
             ) : null}

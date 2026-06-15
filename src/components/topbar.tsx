@@ -26,7 +26,7 @@ export function Topbar() {
           href="/pedidos/novo"
           className="rounded-xl bg-[var(--k2-red-2)] px-4 py-3 text-sm font-semibold text-white shadow-sm hover:opacity-95"
         >
-          + Novo pedido
+          + Novo orçamento
         </Link>
       </div>
     </header>

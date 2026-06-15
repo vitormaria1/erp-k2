@@ -1,3 +1,5 @@
+import { formatOrderCode } from "@/lib/order-format";
+
 import { getFiscalDbPool } from "../infra/pg";
 import { withPgTx } from "../persistence/pg/tx";
 import { FiscalInvoiceRepositoryPg } from "../persistence/pg";
@@ -17,7 +19,7 @@ export class OrderAlreadyHasInvoiceError extends Error {
   }) {
     const numeroLabel = args.invoiceNumber == null ? "sem número final" : `nº ${args.invoiceNumber}`;
     super(
-      `Pedido ${args.orderId} já possui NF em andamento/emitida (${args.invoiceSerie}/${numeroLabel}, status ${args.invoiceStatus}).`
+      `Orçamento ${formatOrderCode(args.orderId)} já possui NF em andamento/emitida (${args.invoiceSerie}/${numeroLabel}, status ${args.invoiceStatus}).`
     );
     this.name = "OrderAlreadyHasInvoiceError";
     this.invoiceId = args.invoiceId;

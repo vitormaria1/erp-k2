@@ -32,7 +32,7 @@ export function PedidoBoletoButton({ receivableId }: Props) {
       <input type="hidden" name="receivableId" value={receivableId} />
       <SubmitButton />
       {state.error ? <div className="mt-2 max-w-[240px] text-[11px] text-red-700">{state.error}</div> : null}
-      {state.ok ? <div className="mt-2 text-[11px] text-emerald-700">Boleto gerado. Atualize ou reabra o pedido.</div> : null}
+      {state.ok ? <div className="mt-2 text-[11px] text-emerald-700">Boleto gerado. Atualize ou reabra o orçamento.</div> : null}
     </form>
   );
 }

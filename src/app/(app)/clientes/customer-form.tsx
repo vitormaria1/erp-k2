@@ -171,7 +171,7 @@ export function CustomerForm({ action, customer, submitLabel }: CustomerFormProp
             defaultChecked={Boolean(customer?.tracksOrders)}
             className="h-4 w-4"
           />
-          <span>Acompanha pedidos</span>
+          <span>Acompanha orçamentos</span>
         </label>
         <label className="flex items-center gap-3 rounded-xl border bg-[var(--card)] px-4 py-3 text-sm md:mt-6">
           <input

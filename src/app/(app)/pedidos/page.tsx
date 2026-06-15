@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getDb } from "@/lib/db";
 import { parseAppDate } from "@/lib/datetime";
 import { formatDateTime, getSaoPauloDateIso, getSaoPauloYearMonth } from "@/lib/datetime";
+import { formatOrderCode } from "@/lib/order-format";
 import { ensureFinancialSchema } from "@/lib/financial-ledger";
 import { ensureOrderPaymentSchema, getOrderPaymentMethodLabel } from "@/lib/payments";
 import { extractLinhaDigitavel, extractNossoNumero } from "@/lib/sicredi-cobranca";
@@ -217,7 +218,7 @@ function matchesOrderQuery(order: Row, query: string) {
     order.customerName,
     order.notes ?? "",
     String(order.id),
-    `#${order.id}`,
+    formatOrderCode(order.id),
     createdIso,
     createdMonth,
     formatDateTime(order.createdAt),
@@ -257,7 +258,7 @@ function listOrderSearchSuggestions(limit = 120) {
   const suggestions = new Set<string>();
   for (const row of rows) {
     suggestions.add(row.customerName);
-    suggestions.add(`#${row.id}`);
+    suggestions.add(formatOrderCode(row.id));
     const created = parseAppDate(row.createdAt);
     if (created) {
       suggestions.add(getSaoPauloDateIso(created));
@@ -547,14 +548,14 @@ export default async function PedidosPage(props: {
     <div className="mx-auto w-full max-w-[1560px] px-4 py-6 sm:px-6 lg:px-8">
       <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Pedidos</h1>
+          <h1 className="text-2xl font-semibold">Orçamentos</h1>
           <div className="text-sm text-[var(--muted)]">Acompanhe operacao, faturamento e emissao fiscal.</div>
         </div>
         <Link
           href="/pedidos/novo"
           className="rounded-xl bg-[var(--k2-red-2)] px-4 py-3 text-center text-sm font-semibold text-white"
         >
-          + Novo pedido
+          + Novo orçamento
         </Link>
       </div>
 
@@ -564,7 +565,7 @@ export default async function PedidosPage(props: {
             name="q"
             list="pedidos-search-suggestions"
             defaultValue={filters.q}
-            placeholder="Buscar por cliente, pedido, mês ou data"
+            placeholder="Buscar por cliente, orçamento, mês ou data"
             className="rounded-xl border bg-[var(--card)] px-4 py-3 text-sm"
           />
           <datalist id="pedidos-search-suggestions">
@@ -631,17 +632,17 @@ export default async function PedidosPage(props: {
       </form>
 
       <section className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Pedidos filtrados" value={String(orders.length)} sub="Resultado atual da busca" />
-        <StatCard label="Valor total" value={money.format(summary.totalValue)} sub="Soma dos pedidos listados" />
-        <StatCard label="Pedidos enviados" value={String(summary.sentCount)} sub="Em rota ou a caminho" />
-        <StatCard label="Pedidos entregues" value={String(summary.deliveredCount)} sub="Prontos no ciclo logistico" />
+        <StatCard label="Orçamentos filtrados" value={String(orders.length)} sub="Resultado atual da busca" />
+        <StatCard label="Valor total" value={money.format(summary.totalValue)} sub="Soma dos orçamentos listados" />
+        <StatCard label="Orçamentos enviados" value={String(summary.sentCount)} sub="Em rota ou a caminho" />
+        <StatCard label="Orçamentos entregues" value={String(summary.deliveredCount)} sub="Prontos no ciclo logistico" />
       </section>
 
       <section className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-[1.3fr_1fr_1fr]">
         <div className="rounded-2xl border bg-[var(--card)] p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold">Volume dos ultimos 7 dias</h2>
-            <div className="text-xs text-[var(--muted)]">Pedidos e valor por dia</div>
+            <div className="text-xs text-[var(--muted)]">Orçamentos e valor por dia</div>
           </div>
           <div className="mt-5 grid grid-cols-7 gap-3">
             {summary.last7Days.map((day) => {
@@ -666,7 +667,7 @@ export default async function PedidosPage(props: {
         </div>
 
         <MiniBarChart
-          title="Pedidos por status"
+          title="Orçamentos por status"
           items={summary.statusBars.map((item) => ({
             label: item.meta.label,
             value: item.count,
@@ -697,7 +698,7 @@ export default async function PedidosPage(props: {
         <table className="min-w-[1240px] w-full text-sm">
           <thead className="bg-black/[0.02] text-left text-[var(--muted)]">
             <tr>
-              <th className="px-4 py-3">#</th>
+              <th className="px-4 py-3">Orçamento</th>
               <th className="px-4 py-3">Cliente</th>
               <th className="px-4 py-3">Itens</th>
               <th className="px-4 py-3">Valor</th>
@@ -711,7 +712,7 @@ export default async function PedidosPage(props: {
           <tbody>
             {orders.map((order) => (
               <tr key={order.id} className="border-t align-top">
-                <td className="px-4 py-3 font-medium">#{order.id}</td>
+                <td className="px-4 py-3 font-medium">{formatOrderCode(order.id)}</td>
                 <td className="px-4 py-3">{order.customerName}</td>
                 <td className="px-4 py-3">{order.itemsCount}</td>
                 <td className="px-4 py-3 font-semibold">{money.format(order.totalAmount)}</td>
@@ -864,7 +865,7 @@ export default async function PedidosPage(props: {
             {orders.length === 0 ? (
               <tr>
                 <td className="px-4 py-8 text-[var(--muted)]" colSpan={9}>
-                  Nenhum pedido encontrado com os filtros atuais.
+                  Nenhum orçamento encontrado com os filtros atuais.
                 </td>
               </tr>
             ) : null}

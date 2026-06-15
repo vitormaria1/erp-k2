@@ -22,7 +22,7 @@ function wantsJson(req: Request) {
 
 function formatIssueError(error: unknown, ambiente: string) {
   if (error instanceof OrderAlreadyHasInvoiceError) {
-    return `Este pedido já possui NF vinculada (${error.invoiceSerie}/${error.invoiceNumber ?? "-"}, status ${error.invoiceStatus}).`;
+    return `Este orçamento já possui NF vinculada (${error.invoiceSerie}/${error.invoiceNumber ?? "-"}, status ${error.invoiceStatus}).`;
   }
   if (error instanceof FiscalValidationError) {
     return `Não foi possível emitir a NF-e (${ambiente}). Corrija o cadastro e tente novamente: ${error.message}`;

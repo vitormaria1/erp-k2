@@ -9,6 +9,7 @@ import {
 } from "../../lib/payments";
 import { getIssuerConfig } from "../config/issuer";
 import { getNfeDefaults, pickNfeDefaultsByAmbiente } from "../config/nfe_defaults";
+import { formatOrderCode } from "@/lib/order-format";
 import { isPedidoFiscalOperationCode } from "../config/operation_options";
 import { getFiscalDbPool } from "../infra/pg";
 import { FiscalOperationRepositoryPg, ProductFiscalDataRepositoryPg } from "../persistence/pg";
@@ -99,7 +100,7 @@ function loadOrder(orderId: number): { order: OrderRow; items: ItemRow[]; receiv
     )
     .get(orderId) as OrderRow | undefined;
 
-  if (!order) throw new Error("Pedido não encontrado");
+  if (!order) throw new Error("Orçamento não encontrado");
 
   const items = db
     .prepare(
@@ -140,7 +141,7 @@ function loadOrder(orderId: number): { order: OrderRow; items: ItemRow[]; receiv
 
 export async function buildFiscalDraftFromOrder(orderId: number, opts?: { fiscalOperationCode?: string }) {
   const { order, items, receivables } = loadOrder(orderId);
-  if (!items.length) throw new Error("Pedido sem itens");
+  if (!items.length) throw new Error("Orçamento sem itens");
 
   const issuer = getIssuerConfig();
   const defaults = pickNfeDefaultsByAmbiente(getNfeDefaults(), getConfiguredFocusAmbiente());
@@ -179,7 +180,7 @@ export async function buildFiscalDraftFromOrder(orderId: number, opts?: { fiscal
     const estadualValue = round2((totalAmount * estadualRate) / 100);
     const customerCode = String(order.customerCode ?? "").replace(/[^\d]/g, "");
     const codePrefix = customerCode ? `${customerCode.padStart(8, "0")} ` : "";
-    return `${codePrefix}${String(order.customerName).toUpperCase()}|Cod.Pedido(s): ${orderId}|Trib aprox. R$ Federal: ${federalValue.toFixed(2)} (${federalRate.toFixed(2)}%) Estadual: ${estadualValue.toFixed(2)} (${estadualRate.toFixed(2)}%) - Fonte:IBPT/empresometro.com.br 1C2537`;
+    return `${codePrefix}${String(order.customerName).toUpperCase()}|Cod.Orçamento(s): ${formatOrderCode(orderId)}|Trib aprox. R$ Federal: ${federalValue.toFixed(2)} (${federalRate.toFixed(2)}%) Estadual: ${estadualValue.toFixed(2)} (${estadualRate.toFixed(2)}%) - Fonte:IBPT/empresometro.com.br 1C2537`;
   };
   const buildBillingOverrides = () => {
     if (order.paymentMethod !== "BOLETO" || receivables.length === 0) return {};

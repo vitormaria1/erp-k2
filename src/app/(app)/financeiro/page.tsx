@@ -4,6 +4,7 @@ import { getFiscalDbPool } from "@/fiscal/infra/pg";
 import { getDb } from "@/lib/db";
 import { formatDate, formatDateTime, getSaoPauloDateIso, startOfSaoPauloWeekIso } from "@/lib/datetime";
 import { ensureFinancialSchema } from "@/lib/financial-ledger";
+import { formatOrderCode } from "@/lib/order-format";
 import { getOrderPaymentMethodLabel } from "@/lib/payments";
 import { extractLinhaDigitavel, extractNossoNumero } from "@/lib/sicredi-cobranca";
 import { getBoletoWebhookVisualState, reconcileDeferredSicrediSettlements } from "@/lib/sicredi-webhook";
@@ -649,7 +650,7 @@ function FinanceSectionNav(props: {
 }
 
 export default async function FinanceiroPage(props: {
-  searchParams?: Promise<{ loadingId?: string; from?: string; to?: string; preset?: string; setor?: string }>;
+  searchParams?: Promise<{ loadingId?: string; from?: string; to?: string; preset?: string; setor?: string; receivableId?: string }>;
 }) {
   if (!(await isFinanceAuthenticated())) {
     return <FinanceUnlockForm />;
@@ -658,9 +659,12 @@ export default async function FinanceiroPage(props: {
   reconcileDeferredSicrediSettlements();
 
   const sp = (await props.searchParams) ?? {};
+  const receivableId = sp.receivableId?.trim() ?? "";
   const setorParam = sp.setor?.trim() ?? "";
   const activeSection: FinanceSection =
-    setorParam === "caixa" || setorParam === "rotas" || setorParam === "receber" || setorParam === "pagar"
+    receivableId
+      ? "receber"
+      : setorParam === "caixa" || setorParam === "rotas" || setorParam === "receber" || setorParam === "pagar"
       ? setorParam
       : "dashboard";
   const loadingId = sp.loadingId?.trim() ?? "";
@@ -698,7 +702,7 @@ export default async function FinanceiroPage(props: {
     <div className="mx-auto max-w-7xl px-6 py-6">
       <h1 className="text-2xl font-semibold">Financeiro</h1>
       <div className="mt-1 text-sm text-[var(--muted)]">
-        Controle de pagamentos, caixa e acompanhamento operacional dos pedidos.
+        Controle de pagamentos, caixa e acompanhamento operacional dos orçamentos.
       </div>
       <FinanceSectionNav active={activeSection} cashPeriod={cashPeriod} activeLoadingId={activeLoadingId} />
 
@@ -733,16 +737,16 @@ export default async function FinanceiroPage(props: {
           />
           <FinanceSectionCard
             title="Fechamento da rota"
-            description="Conferencia dos pedidos carregados e definicao do que foi recebido."
+            description="Conferência dos orçamentos carregados e definição do que foi recebido."
             href={buildFinanceHref({ setor: "rotas", cashPeriod, activeLoadingId })}
             metrics={[
-              { label: "Pedidos", value: String(routeSummary.orders) },
+              { label: "Orçamentos", value: String(routeSummary.orders) },
               { label: "Pendentes", value: String(routeSummary.pending) },
             ]}
           />
           <FinanceSectionCard
             title="Contas a receber"
-            description="Titulos de clientes, baixas e status financeiro dos pedidos."
+            description="Títulos de clientes, baixas e status financeiro dos orçamentos."
             href={buildFinanceHref({ setor: "receber", cashPeriod, activeLoadingId })}
             metrics={[
               { label: "Pendentes", value: money.format(summary.pendingAmount) },
@@ -832,7 +836,7 @@ export default async function FinanceiroPage(props: {
                     </div>
                     <div className="text-xs text-[var(--muted)]">
                       {movement.orderId
-                        ? `Pedido #${movement.orderId}`
+                        ? `Orçamento ${formatOrderCode(movement.orderId)}`
                         : movement.purchaseInvoiceNumber
                           ? `Nota ${movement.purchaseInvoiceNumber}`
                           : movement.note ?? "-"}
@@ -960,7 +964,7 @@ export default async function FinanceiroPage(props: {
           <div>
             <h2 className="text-base font-semibold">Fechamento da rota</h2>
             <div className="mt-1 text-sm text-[var(--muted)]">
-              Ao fechar a rota, todos os pedidos ficam como entregues. Aqui voce decide apenas quais pagamentos foram recebidos e quais seguem pendentes.
+              Ao fechar a rota, todos os orçamentos ficam como entregues. Aqui voce decide apenas quais pagamentos foram recebidos e quais seguem pendentes.
             </div>
           </div>
           <div className="flex w-full flex-col gap-2 lg:max-w-xl">
@@ -977,7 +981,7 @@ export default async function FinanceiroPage(props: {
                 {loadings.length === 0 ? <option value="">Nenhum carregamento</option> : null}
                 {loadings.map((loading) => (
                   <option key={loading.id} value={loading.id}>
-                    {formatDate(loading.createdAt)} · {loading.ordersCount} pedidos
+                    {formatDate(loading.createdAt)} · {loading.ordersCount} orçamentos
                   </option>
                 ))}
               </select>
@@ -997,7 +1001,7 @@ export default async function FinanceiroPage(props: {
         {activeLoadingId ? (
           <>
             <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <StatCard label="Pedidos na rota" value={String(routeSummary.orders)} sub="Carregamento selecionado" />
+              <StatCard label="Orçamentos na rota" value={String(routeSummary.orders)} sub="Carregamento selecionado" />
               <StatCard label="Valor da rota" value={money.format(routeSummary.amount)} sub="Total previsto da rota" />
               <StatCard label="Ja pagos" value={String(routeSummary.paid)} sub="Pagamentos recebidos" />
               <StatCard label="Pendentes" value={String(routeSummary.pending)} sub="Entregues sem pagamento" />
@@ -1008,8 +1012,8 @@ export default async function FinanceiroPage(props: {
                 <thead className="bg-black/[0.02] text-left text-[var(--muted)]">
                   <tr>
                     <th className="px-4 py-3">Cliente</th>
-                    <th className="px-4 py-3">Pedido</th>
-                    <th className="px-4 py-3">Status pedido</th>
+                    <th className="px-4 py-3">Orçamento</th>
+                    <th className="px-4 py-3">Status do orçamento</th>
                     <th className="px-4 py-3">NF</th>
                     <th className="px-4 py-3">Pagamento</th>
                     <th className="px-4 py-3">Valor</th>
@@ -1025,7 +1029,7 @@ export default async function FinanceiroPage(props: {
                     return (
                       <tr key={row.orderId} className="border-t align-top">
                         <td className="px-4 py-3 font-semibold">{row.customerName}</td>
-                        <td className="px-4 py-3">#{row.orderId}</td>
+                        <td className="px-4 py-3">{formatOrderCode(row.orderId)}</td>
                         <td className="px-4 py-3">
                           <span className={["inline-flex rounded-full px-3 py-1 text-xs font-semibold", orderMeta.className].join(" ")}>
                             {orderMeta.label}
@@ -1090,7 +1094,7 @@ export default async function FinanceiroPage(props: {
                   {routeRows.length === 0 ? (
                     <tr>
                       <td className="px-4 py-8 text-[var(--muted)]" colSpan={8}>
-                        Nenhum pedido encontrado nesse carregamento.
+                        Nenhum orçamento encontrado nesse carregamento.
                       </td>
                     </tr>
                   ) : null}
@@ -1110,7 +1114,7 @@ export default async function FinanceiroPage(props: {
       <section className="mt-6">
         <div className="mb-3">
           <h2 className="text-base font-semibold">Contas a receber</h2>
-          <div className="text-sm text-[var(--muted)]">Baixas de clientes e status financeiro dos pedidos faturados.</div>
+          <div className="text-sm text-[var(--muted)]">Baixas de clientes e status financeiro dos orçamentos faturados.</div>
         </div>
         <form action={financeLockAction} className="mb-3">
           <button className="rounded-xl border px-4 py-2 text-xs font-semibold">Bloquear financeiro</button>
@@ -1120,8 +1124,8 @@ export default async function FinanceiroPage(props: {
             <thead className="bg-black/[0.02] text-left text-[var(--muted)]">
               <tr>
                 <th className="px-4 py-3">Cliente</th>
-                <th className="px-4 py-3">Pedido</th>
-                <th className="px-4 py-3">Status pedido</th>
+                <th className="px-4 py-3">Orçamento</th>
+                <th className="px-4 py-3">Status do orçamento</th>
                 <th className="px-4 py-3">Nota fiscal</th>
                 <th className="px-4 py-3">Metodo</th>
                 <th className="px-4 py-3">Vencimento</th>
@@ -1141,12 +1145,19 @@ export default async function FinanceiroPage(props: {
                 const paymentMeta = getPaymentMeta(r.status);
                 const boleto = parseBoletoPayload(r.boletoPayloadJson);
                 return (
-                  <tr key={r.id} className="border-t align-top">
+                  <tr
+                    key={r.id}
+                    id={`receivable-${r.id}`}
+                    className={[
+                      "border-t align-top",
+                      receivableId === r.id ? "bg-amber-50/70 ring-1 ring-inset ring-amber-300" : "",
+                    ].join(" ")}
+                  >
                   <td className="px-4 py-3">
                     <div className="font-semibold">{r.customerName}</div>
                     <div className="text-xs text-[var(--muted)]">Lancado em {formatDate(r.createdAt)}</div>
                   </td>
-                  <td className="px-4 py-3">{r.orderId ? `#${r.orderId}` : "-"}</td>
+                  <td className="px-4 py-3">{typeof r.orderId === "number" ? formatOrderCode(r.orderId) : "-"}</td>
                   <td className="px-4 py-3">
                     {typeof r.orderId === "number" && orderMeta ? (
                       <div className="space-y-2">
@@ -1169,7 +1180,7 @@ export default async function FinanceiroPage(props: {
                         </form>
                       </div>
                     ) : (
-                      <span className="text-xs text-[var(--muted)]">Sem pedido</span>
+                      <span className="text-xs text-[var(--muted)]">Sem orçamento</span>
                     )}
                   </td>
                   <td className="px-4 py-3">
@@ -1320,7 +1331,7 @@ export default async function FinanceiroPage(props: {
               {rows.length === 0 ? (
                 <tr>
                   <td className="px-4 py-8 text-[var(--muted)]" colSpan={11}>
-                    Nenhum recebivel ainda. Ao criar pedido com preco, um recebivel e criado automaticamente.
+                    Nenhum recebível ainda. Ao criar orçamento com preço, um recebível é criado automaticamente.
                   </td>
                 </tr>
               ) : null}

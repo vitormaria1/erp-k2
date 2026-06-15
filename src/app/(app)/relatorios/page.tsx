@@ -118,7 +118,7 @@ export default async function RelatoriosPage(props: {
         <div className="border-b px-5 py-4">
           <div className="text-sm font-semibold">Movimentações de estoque</div>
           <div className="text-sm text-[var(--muted)]">
-            Entradas/saídas por compras, pedidos, produção e ajustes (últimas {movements.length}).
+            Entradas/saídas por compras, orçamentos, produção e ajustes (últimas {movements.length}).
           </div>
         </div>
         <table className="w-full text-sm">

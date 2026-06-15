@@ -77,7 +77,7 @@ export default async function ClientesPage(props: {
               <option value="no">Somente não contribuintes</option>
             </select>
             <select name="tracks" defaultValue={tracks} className="rounded-xl border bg-[var(--card)] px-4 py-3 text-sm">
-              <option value="">Acompanha pedidos: todos</option>
+              <option value="">Acompanha orçamentos: todos</option>
               <option value="yes">Somente sim</option>
               <option value="no">Somente não</option>
             </select>
@@ -103,7 +103,7 @@ export default async function ClientesPage(props: {
         <div className="rounded-2xl border bg-[var(--card)] p-5 shadow-sm">
           <div className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Ativos</div>
           <div className="mt-2 text-3xl font-semibold">{summary.active}</div>
-          <div className="mt-1 text-sm text-[var(--muted)]">Disponíveis para pedido/NF</div>
+          <div className="mt-1 text-sm text-[var(--muted)]">Disponíveis para orçamento/NF</div>
         </div>
         <div className="rounded-2xl border bg-[var(--card)] p-5 shadow-sm">
           <div className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Contribuintes</div>
@@ -111,7 +111,7 @@ export default async function ClientesPage(props: {
           <div className="mt-1 text-sm text-[var(--muted)]">Com IE / perfil fiscal ativo</div>
         </div>
         <div className="rounded-2xl border bg-[var(--card)] p-5 shadow-sm">
-          <div className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Acompanham pedidos</div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Acompanham orçamentos</div>
           <div className="mt-2 text-3xl font-semibold">{summary.tracksOrders}</div>
           <div className="mt-1 text-sm text-[var(--muted)]">Marcados para rotina comercial</div>
         </div>
@@ -149,7 +149,7 @@ export default async function ClientesPage(props: {
               <th className="px-4 py-3">Telefone</th>
               <th className="px-4 py-3">E-mail</th>
               <th className="px-4 py-3">Home page</th>
-              <th className="px-4 py-3">Acomp. pedidos</th>
+              <th className="px-4 py-3">Acomp. orç.</th>
               <th className="px-4 py-3">Data cad.</th>
               <th className="px-4 py-3">Última atualiz.</th>
               <th className="px-4 py-3">Bloqueado</th>

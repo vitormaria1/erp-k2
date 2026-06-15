@@ -6,7 +6,7 @@ export const FINANCE_AUTH_COOKIE_NAME = "k2_finance_session";
 const FINANCE_AUTH_COOKIE_VALUE = "k2_finance_session_v1";
 
 export const SIMPLE_LOGIN_USERNAME = "admin";
-export const SIMPLE_LOGIN_PASSWORD = "k2123";
+export const SIMPLE_LOGIN_PASSWORD = "hava13";
 export const SIMPLE_FINANCE_PIN = "1975";
 
 export async function isAuthenticated() {

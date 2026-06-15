@@ -19,7 +19,7 @@ export default async function LoginPage() {
 
       <div className="relative mx-auto flex min-h-screen max-w-7xl items-center justify-center px-6 py-10">
         <div className="w-full max-w-[560px]">
-          <div className="mb-6 text-center text-2xl font-medium tracking-[0.08em] text-white/90 sm:mb-8 sm:text-3xl">
+          <div className="mb-6 text-center text-2xl font-medium tracking-[0.08em] text-black/80 sm:mb-8 sm:text-3xl">
             Refletindo o Amor no Sabor
           </div>
           <div className="relative">

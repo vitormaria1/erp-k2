@@ -56,7 +56,7 @@ function listCustomersForRoutes(): CustomerOpt[] {
 
 function statusLabel(s: EntryRow["status"]) {
   if (s === "MESSAGE_SENT") return "Mensagem enviada";
-  if (s === "ORDER_PLACED") return "Pedido feito";
+  if (s === "ORDER_PLACED") return "Orçamento feito";
   return "Sem status";
 }
 
@@ -171,7 +171,7 @@ export default async function RotasPage(props: { searchParams?: Promise<{ week?:
                         >
                           <option value="NONE">Sem status</option>
                           <option value="MESSAGE_SENT">Mensagem enviada</option>
-                          <option value="ORDER_PLACED">Pedido feito</option>
+                          <option value="ORDER_PLACED">Orçamento feito</option>
                         </select>
                         <input
                           name="notes"

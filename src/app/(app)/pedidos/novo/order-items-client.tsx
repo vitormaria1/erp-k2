@@ -183,7 +183,7 @@ export function OrderItemsClient({ products, formId }: { products: ProductOpt[];
       </div>
 
       <div className="flex items-center justify-between rounded-2xl border bg-black/[0.03] px-4 py-3">
-        <div className="text-sm text-[var(--muted)]">Total atual do pedido</div>
+        <div className="text-sm text-[var(--muted)]">Total atual do orçamento</div>
         <div className="text-lg font-semibold">R$ {orderTotal.toFixed(2)}</div>
       </div>
 

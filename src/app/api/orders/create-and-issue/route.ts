@@ -19,19 +19,19 @@ async function runInlineFiscalWorker() {
 
 function formatIssueError(error: unknown, ambiente: string) {
   if (error instanceof OrderAlreadyHasInvoiceError) {
-    return `Este pedido já possui NF vinculada (${error.invoiceSerie}/${error.invoiceNumber ?? "-"}, status ${error.invoiceStatus}).`;
+    return `Este orçamento já possui NF vinculada (${error.invoiceSerie}/${error.invoiceNumber ?? "-"}, status ${error.invoiceStatus}).`;
   }
   if (error instanceof FiscalValidationError) {
-    return `Pedido criado, mas não foi possível emitir a NF-e (${ambiente}). Corrija o cadastro e tente novamente: ${error.message}`;
+    return `Orçamento criado, mas não foi possível emitir a NF-e (${ambiente}). Corrija o cadastro e tente novamente: ${error.message}`;
   }
   const msg = error instanceof Error ? error.message : String(error);
   if (/Config Focus NFe inválida|FOCUS_NFE_/i.test(msg)) {
-    return `Pedido criado, mas não foi possível emitir a NF-e (${ambiente}). A integração com a Focus não está configurada corretamente no ambiente.`;
+    return `Orçamento criado, mas não foi possível emitir a NF-e (${ambiente}). A integração com a Focus não está configurada corretamente no ambiente.`;
   }
   if (/DATABASE_URL ausente|Supabase|Postgres/i.test(msg)) {
-    return `Pedido criado, mas não foi possível emitir a NF-e (${ambiente}). O banco fiscal não está acessível no momento.`;
+    return `Orçamento criado, mas não foi possível emitir a NF-e (${ambiente}). O banco fiscal não está acessível no momento.`;
   }
-  return `Pedido criado, mas falhou a emissão da NF-e (${ambiente}): ${msg}`;
+  return `Orçamento criado, mas falhou a emissão da NF-e (${ambiente}): ${msg}`;
 }
 
 export async function POST(req: Request) {

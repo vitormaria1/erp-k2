@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { PrintButtons, PrintOnLoad } from "@/app/(print)/pedidos/[id]/imprimir/print-client";
 import { getDb } from "@/lib/db";
 import { formatDateTime } from "@/lib/datetime";
+import { formatOrderCode } from "@/lib/order-format";
 
 type TotalsRow = {
   code: string;
@@ -157,13 +158,13 @@ export default async function PrintCarregamentoPage({
 
           <div className="mt-2 rounded-xl border p-2">
             <div className="flex items-center justify-between">
-              <div className="text-[11px] font-extrabold">Pedidos no carregamento</div>
-              <div className="text-[9px] text-black/60">{data.orders.length} pedidos</div>
+              <div className="text-[11px] font-extrabold">Orçamentos no carregamento</div>
+              <div className="text-[9px] text-black/60">{data.orders.length} orçamentos</div>
             </div>
             <div className="mt-1 space-y-0.5 text-[9px] leading-tight">
               {data.orders.map((o) => (
                 <div key={o.id} className="truncate rounded-md border px-2 py-0.5">
-                  <span className="font-semibold">#{o.id}</span>{" "}
+                  <span className="font-semibold">{formatOrderCode(o.id)}</span>{" "}
                   <span className="font-medium">
                     {o.customerTradeName ? o.customerTradeName : o.customerName}
                   </span>
@@ -173,7 +174,7 @@ export default async function PrintCarregamentoPage({
                 </div>
               ))}
               {data.orders.length === 0 ? (
-                <div className="text-black/60">Nenhum pedido vinculado.</div>
+                <div className="text-black/60">Nenhum orçamento vinculado.</div>
               ) : null}
             </div>
           </div>

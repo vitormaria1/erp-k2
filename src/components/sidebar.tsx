@@ -10,7 +10,7 @@ type NavItem = { href: string; label: string };
 const nav: NavItem[] = [
   { href: "/rotas", label: "Rotas" },
   { href: "/dashboard", label: "Dashboard" },
-  { href: "/pedidos", label: "Pedidos" },
+  { href: "/pedidos", label: "Orçamentos" },
   { href: "/carregamentos", label: "Carregamento" },
   { href: "/producao", label: "Produção" },
   { href: "/compras", label: "Compras" },

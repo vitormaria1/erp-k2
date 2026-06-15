@@ -45,13 +45,13 @@ export default function NovoPedidoPage() {
     <div className="mx-auto max-w-6xl px-6 py-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Novo pedido</h1>
+          <h1 className="text-2xl font-semibold">Novo orçamento</h1>
           <div className="mt-1 text-sm text-[var(--muted)]">
-            Selecione o cliente, monte os itens e crie o pedido.
+            Selecione o cliente, monte os itens e crie o orçamento.
           </div>
         </div>
         <Link href="/pedidos" className="inline-flex rounded-xl border px-4 py-2 text-sm font-semibold">
-          Voltar para pedidos
+          Voltar para orçamentos
         </Link>
       </div>
 

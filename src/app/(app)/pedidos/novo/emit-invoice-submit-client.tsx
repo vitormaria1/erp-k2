@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import { formatOrderCode } from "@/lib/order-format";
 
 import {
   FISCAL_OPERATION_CODE_VENDA_INTERNA,
@@ -177,7 +178,7 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
           if (postAuthorizedRedirectTo) {
             setNotice((prev) => ({
               tone: "success",
-              text: "NF autorizada. A DANFE foi aberta na outra guia e a cobranca foi liberada na tela de pedidos.",
+              text: "NF autorizada. A DANFE foi aberta na outra guia e a cobrança foi liberada na tela de orçamentos.",
               orderPrintUrl: prev.orderPrintUrl,
               danfeUrl: finalDanfeUrl,
               ordersUrl: prev.ordersUrl,
@@ -242,7 +243,7 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
     popupRef.current = openDanfeTargetWindow();
     setNotice({
       tone: "loading",
-      text: "Criando pedido e emitindo NF. A outra guia mostrará o andamento até liberar a DANFE.",
+      text: "Criando orçamento e emitindo NF. A outra guia mostrará o andamento até liberar a DANFE.",
     });
 
     startTransition(async () => {
@@ -257,25 +258,25 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
 
         const payload = (await res.json().catch(() => null)) as IssueResponse | null;
         if (!payload) {
-          throw new Error("Resposta inválida ao criar pedido e emitir NF.");
+          throw new Error("Resposta inválida ao criar orçamento e emitir NF.");
         }
 
         if (res.ok) {
           resetOrderForm(form);
           setNotice({
             tone: "success",
-            text: `Pedido #${payload.orderId ?? "-"} criado. A NF está sendo processada.`,
+            text: `Orçamento ${formatOrderCode(payload.orderId)} criado. A NF está sendo processada.`,
             orderPrintUrl: payload.orderPrintUrl,
             danfeUrl: undefined,
-            ordersUrl: payload.orderId ? `/pedidos?period=today&q=%23${payload.orderId}` : "/pedidos?period=today",
+            ordersUrl: payload.orderId ? `/pedidos?period=today&q=${formatOrderCode(payload.orderId)}` : "/pedidos?period=today",
           });
           if (payload.invoiceId) {
             setNotice({
               tone: "loading",
-              text: `Pedido #${payload.orderId ?? "-"} criado. Aguardando autorização da NF para liberar ${payload.postAuthorizedRedirectTo ? "a cobranca em Pedidos" : "a DANFE"}...`,
+              text: `Orçamento ${formatOrderCode(payload.orderId)} criado. Aguardando autorização da NF para liberar ${payload.postAuthorizedRedirectTo ? "a cobrança em Orçamentos" : "a DANFE"}...`,
               orderPrintUrl: payload.orderPrintUrl,
               danfeUrl: undefined,
-              ordersUrl: payload.orderId ? `/pedidos?period=today&q=%23${payload.orderId}` : "/pedidos?period=today",
+              ordersUrl: payload.orderId ? `/pedidos?period=today&q=${formatOrderCode(payload.orderId)}` : "/pedidos?period=today",
             });
             void waitForDanfe(payload.invoiceId, payload.redirectTo, payload.postAuthorizedRedirectTo);
           }
@@ -285,7 +286,7 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
         if (res.status === 409) {
           setNotice({
             tone: "error",
-            text: payload.error ?? "Este pedido já possui NF vinculada.",
+            text: payload.error ?? "Este orçamento já possui NF vinculada.",
             orderPrintUrl: payload.orderPrintUrl,
             danfeUrl: undefined,
           });
@@ -294,7 +295,7 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
 
         setNotice({
           tone: "error",
-          text: payload.error ?? "Falha ao criar pedido e emitir NF.",
+          text: payload.error ?? "Falha ao criar orçamento e emitir NF.",
           orderPrintUrl: payload.orderPrintUrl,
           danfeUrl: undefined,
         });
@@ -313,7 +314,7 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
     const popup = window.open("", "_blank");
     setNotice({
       tone: "loading",
-      text: "Criando pedido e abrindo a impressão em outra guia.",
+      text: "Criando orçamento e abrindo a impressão em outra guia.",
     });
 
     startTransition(async () => {
@@ -327,14 +328,14 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
 
         const payload = (await res.json().catch(() => null)) as CreateOrderResponse | null;
         if (!payload) {
-          throw new Error("Resposta inválida ao criar pedido.");
+          throw new Error("Resposta inválida ao criar orçamento.");
         }
 
         if (!res.ok || !payload.ok || !payload.orderPrintUrl) {
           if (popup && !popup.closed) popup.close();
           setNotice({
             tone: "error",
-            text: payload.error ?? "Falha ao criar pedido.",
+            text: payload.error ?? "Falha ao criar orçamento.",
           });
           return;
         }
@@ -349,7 +350,7 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
 
         setNotice({
           tone: "success",
-          text: `Pedido #${payload.orderId ?? "-"} criado. A impressão foi aberta em outra guia.`,
+          text: `Orçamento ${formatOrderCode(payload.orderId)} criado. A impressão foi aberta em outra guia.`,
           orderPrintUrl: payload.orderPrintUrl,
         });
       } catch (error) {
@@ -376,7 +377,7 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
           disabled={isPending}
           className="cursor-pointer rounded-xl border px-5 py-3 text-sm font-semibold"
         >
-          Criar pedido
+          Criar orçamento
         </button>
         <button
           type="button"
@@ -409,7 +410,7 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
           </div>
           {notice.orderPrintUrl ? (
             <a className="mt-2 inline-block font-semibold underline" href={notice.orderPrintUrl} target="_blank" rel="noreferrer">
-              Abrir impressão do pedido
+              Abrir impressão do orçamento
             </a>
           ) : null}
         </div>
@@ -419,7 +420,7 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
           <div>{notice.text}</div>
           {notice.orderPrintUrl ? (
             <a className="mt-2 inline-block font-semibold underline" href={notice.orderPrintUrl} target="_blank" rel="noreferrer">
-              Abrir impressão do pedido
+              Abrir impressão do orçamento
             </a>
           ) : null}
           {notice.danfeUrl ? (
@@ -433,7 +434,7 @@ export function EmitInvoiceSubmitClient({ formId }: Props) {
           ) : null}
           {notice.ordersUrl ? (
             <a className="mt-2 block font-semibold underline" href={notice.ordersUrl}>
-              Abrir pedido em Pedidos
+              Abrir orçamento em Orçamentos
             </a>
           ) : null}
         </div>

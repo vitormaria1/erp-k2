@@ -102,7 +102,7 @@ export default async function EstoquePage(props: { searchParams?: Promise<{ q?: 
         <div className="rounded-2xl border bg-[var(--card)] p-5 shadow-sm">
           <div className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Ativos</div>
           <div className="mt-2 text-3xl font-semibold">{summary.active}</div>
-          <div className="mt-1 text-sm text-[var(--muted)]">Disponíveis para pedido/NF</div>
+          <div className="mt-1 text-sm text-[var(--muted)]">Disponíveis para orçamento/NF</div>
         </div>
         <div className="rounded-2xl border bg-[var(--card)] p-5 shadow-sm">
           <div className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Estoque baixo</div>

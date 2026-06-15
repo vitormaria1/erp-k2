@@ -332,7 +332,7 @@ export class SicrediCobrancaClient {
       tipoCobranca: this.config.tipoCobranca,
       seuNumero: buildSeuNumero(args.receivableId, args.orderId),
       valor: Number(args.amount.toFixed(2)),
-      informativo: args.orderId ? [`Pedido ${args.orderId}`] : undefined,
+      informativo: args.orderId ? [`Orçamento ${formatOrderCode(args.orderId)}`] : undefined,
       mensagem: [`Recebivel ${args.receivableId}`],
     };
 
@@ -468,3 +468,4 @@ export class SicrediCobrancaClient {
     return body;
   }
 }
+import { formatOrderCode } from "./order-format";

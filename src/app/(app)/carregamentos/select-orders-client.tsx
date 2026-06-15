@@ -4,6 +4,7 @@ import * as React from "react";
 
 import { createLoadingAction } from "@/app/(app)/carregamentos/actions";
 import { formatDateTime } from "@/lib/datetime";
+import { formatOrderCode } from "@/lib/order-format";
 
 export type OrderRow = {
   id: number;
@@ -37,9 +38,9 @@ export function SelectOrdersClient({ orders }: { orders: OrderRow[] }) {
     <>
       <div className="mt-5 flex flex-col gap-3 rounded-2xl border bg-[var(--card)] p-4 shadow-sm md:flex-row md:items-end md:justify-between">
         <div>
-          <div className="text-sm font-semibold">Selecionar pedidos</div>
+          <div className="text-sm font-semibold">Selecionar orçamentos</div>
           <div className="text-sm text-[var(--muted)]">
-            Marque os pedidos abaixo para montar a carga.
+            Marque os orçamentos abaixo para montar a carga.
           </div>
         </div>
         <form action={createLoadingAction} className="flex flex-col gap-2 md:flex-row md:items-center">
@@ -74,7 +75,7 @@ export function SelectOrdersClient({ orders }: { orders: OrderRow[] }) {
                   <span>Sel.</span>
                 </label>
               </th>
-              <th className="px-4 py-3">#</th>
+              <th className="px-4 py-3">Orçamento</th>
               <th className="px-4 py-3">Cliente</th>
               <th className="px-4 py-3">Itens</th>
               <th className="px-4 py-3">Status</th>
@@ -87,7 +88,7 @@ export function SelectOrdersClient({ orders }: { orders: OrderRow[] }) {
                 <td className="px-4 py-3">
                   <input type="checkbox" checked={selected.has(o.id)} onChange={() => toggle(o.id)} />
                 </td>
-                <td className="px-4 py-3 font-medium">#{o.id}</td>
+                <td className="px-4 py-3 font-medium">{formatOrderCode(o.id)}</td>
                 <td className="px-4 py-3">{o.customerName}</td>
                 <td className="px-4 py-3">{o.itemsCount}</td>
                 <td className="px-4 py-3">
@@ -103,7 +104,7 @@ export function SelectOrdersClient({ orders }: { orders: OrderRow[] }) {
             {orders.length === 0 ? (
               <tr>
                 <td className="px-4 py-8 text-[var(--muted)]" colSpan={6}>
-                  Nenhum pedido ainda.
+                  Nenhum orçamento ainda.
                 </td>
               </tr>
             ) : null}

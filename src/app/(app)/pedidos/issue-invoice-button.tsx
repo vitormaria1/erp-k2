@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { formatOrderCode } from "@/lib/order-format";
 
 type InvoiceStatusResponse = {
   id: string;
@@ -118,7 +119,7 @@ export function IssueInvoiceButton(props: {
 
           if (postAuthorizedRedirectTo) {
             router.refresh();
-            setError("NF autorizada. Gere o boleto na coluna de cobranca deste pedido.");
+            setError(`NF autorizada. Gere o boleto na coluna de cobrança deste orçamento ${formatOrderCode(props.orderId)}.`);
           } else {
             setError(null);
           }
@@ -176,7 +177,7 @@ export function IssueInvoiceButton(props: {
           } else {
             router.push(payload.redirectTo);
           }
-          setError(payload.error ?? "Este pedido já possui NF vinculada");
+          setError(payload.error ?? "Este orçamento já possui NF vinculada");
           return;
         }
 

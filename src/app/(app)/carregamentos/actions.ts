@@ -20,7 +20,7 @@ export async function createLoadingAction(formData: FormData) {
 
   const orderIds = z.array(z.coerce.number().int().positive()).parse(JSON.parse(parsed.orderIdsJson));
   const uniq = Array.from(new Set(orderIds));
-  if (uniq.length === 0) throw new Error("Selecione ao menos 1 pedido.");
+  if (uniq.length === 0) throw new Error("Selecione ao menos 1 orçamento.");
 
   const db = getDb();
   const loadingId = randomUUID();
@@ -34,4 +34,3 @@ export async function createLoadingAction(formData: FormData) {
 
   redirect(`/carregamentos/${loadingId}/imprimir`);
 }
-
