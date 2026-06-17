@@ -11,6 +11,10 @@ import { ensureProductSchema, PRODUCT_KIND_VALUES } from "@/lib/catalog-schema";
 import { getDb } from "@/lib/db";
 import { PRODUCT_EDITABLE_FIELDS } from "@/lib/product-columns";
 
+export type SaveProductState = {
+  error: string | null;
+};
+
 const adjustSchema = z.object({
   productId: z.string().min(1),
   type: z.enum(["IN", "OUT", "ADJUSTMENT"]),
@@ -49,58 +53,65 @@ function numberValue(formData: FormData, field: string, fallback: number | null 
 
 const productKindSchema = z.enum(PRODUCT_KIND_VALUES);
 
-export async function saveProductAction(formData: FormData) {
-  const db = getDb();
-  ensureProductSchema(db);
-  const id = textValue(formData, "id") ?? randomUUID();
-  const reference = textValue(formData, "reference");
-  const description = textValue(formData, "description");
-  const unit = textValue(formData, "unit") ?? "UN";
-  const kind = productKindSchema.parse(String(formData.get("kind") ?? "PRODUTO").trim().toUpperCase());
+export async function saveProductAction(_prevState: SaveProductState, formData: FormData): Promise<SaveProductState> {
+  try {
+    const db = getDb();
+    ensureProductSchema(db);
+    const id = textValue(formData, "id") ?? randomUUID();
+    const reference = textValue(formData, "reference");
+    const description = textValue(formData, "description");
+    const unit = textValue(formData, "unit") ?? "UN";
+    const kind = productKindSchema.parse(String(formData.get("kind") ?? "PRODUTO").trim().toUpperCase());
 
-  if (!reference) throw new Error("Informe a referência.");
-  if (!description) throw new Error("Informe a descrição.");
+    if (!reference) return { error: "Informe a referência." };
+    if (!description) return { error: "Informe a descrição." };
 
-  const duplicated = db
-    .prepare("SELECT id FROM products WHERE reference = ? AND id != ? LIMIT 1")
-    .get(reference, id) as { id: string } | undefined;
-  if (duplicated) throw new Error("Já existe um produto com essa referência.");
+    const duplicated = db
+      .prepare("SELECT id FROM products WHERE reference = ? AND id != ? LIMIT 1")
+      .get(reference, id) as { id: string } | undefined;
+    if (duplicated) return { error: "Já existe um produto com essa referência." };
 
-  const productValues: Record<string, string | number | null> = {
-    reference,
-    tele_ref: textValue(formData, "tele_ref"),
-    barcode: textValue(formData, "barcode"),
-    gtin: textValue(formData, "gtin"),
-    description,
-    composition: textValue(formData, "composition"),
-    unit,
-    kind,
-    price: numberValue(formData, "price"),
-    cost: numberValue(formData, "cost"),
-    min_stock: numberValue(formData, "min_stock"),
-    stock_qty: numberValue(formData, "stock_qty", 0),
-    active: String(formData.get("active") ?? "1") === "0" ? 0 : 1,
-  };
+    const productValues: Record<string, string | number | null> = {
+      reference,
+      tele_ref: textValue(formData, "tele_ref"),
+      barcode: textValue(formData, "barcode"),
+      gtin: textValue(formData, "gtin"),
+      description,
+      composition: textValue(formData, "composition"),
+      unit,
+      kind,
+      price: numberValue(formData, "price"),
+      cost: numberValue(formData, "cost"),
+      min_stock: numberValue(formData, "min_stock"),
+      stock_qty: numberValue(formData, "stock_qty", 0),
+      active: String(formData.get("active") ?? "1") === "0" ? 0 : 1,
+    };
 
-  for (const field of PRODUCT_EDITABLE_FIELDS) {
-    if (field in productValues) continue;
-    productValues[field] = textValue(formData, field);
-  }
+    for (const field of PRODUCT_EDITABLE_FIELDS) {
+      if (field in productValues) continue;
+      productValues[field] = textValue(formData, field);
+    }
 
-  const columns = ["id", ...Object.keys(productValues)];
-  const placeholders = columns.map(() => "?").join(", ");
-  const assignments = Object.keys(productValues).map((column) => `"${column.replace(/"/g, '""')}" = excluded."${column.replace(/"/g, '""')}"`);
+    const columns = ["id", ...Object.keys(productValues)];
+    const placeholders = columns.map(() => "?").join(", ");
+    const assignments = Object.keys(productValues).map((column) => `"${column.replace(/"/g, '""')}" = excluded."${column.replace(/"/g, '""')}"`);
 
-  db.prepare(
+    db.prepare(
+      `
+      INSERT INTO products (${columns.map((column) => `"${column.replace(/"/g, '""')}"`).join(", ")})
+      VALUES (${placeholders})
+      ON CONFLICT(id) DO UPDATE SET
+        ${assignments.join(",\n        ")}
     `
-    INSERT INTO products (${columns.map((column) => `"${column.replace(/"/g, '""')}"`).join(", ")})
-    VALUES (${placeholders})
-    ON CONFLICT(id) DO UPDATE SET
-      ${assignments.join(",\n      ")}
-  `
-  ).run(id, ...Object.values(productValues));
+    ).run(id, ...Object.values(productValues));
 
-  revalidatePath("/estoque");
-  revalidatePath(`/estoque/${id}/editar`);
-  redirect("/estoque");
+    revalidatePath("/estoque");
+    revalidatePath(`/estoque/${id}/editar`);
+    redirect("/estoque");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Nao foi possivel salvar o produto.";
+    return {
+      error: message,
+    };
+  }
 }

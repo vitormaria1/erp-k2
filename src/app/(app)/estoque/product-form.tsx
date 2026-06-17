@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useActionState } from "react";
 
 import { saveProductAction } from "./actions";
 import {
@@ -106,8 +109,10 @@ export function ProductForm({
   title: string;
   submitLabel: string;
 }) {
+  const [state, formAction, pending] = useActionState(saveProductAction, { error: null });
+
   return (
-    <form action={saveProductAction} className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-6">
+    <form action={formAction} className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">{title}</h1>
@@ -119,42 +124,51 @@ export function ProductForm({
           <Link className="rounded-xl border px-4 py-3 text-sm font-semibold" href="/estoque">
             Voltar
           </Link>
-          <button className="rounded-xl bg-black px-4 py-3 text-sm font-semibold text-white">
-            {submitLabel}
+          <button
+            disabled={pending}
+            className="rounded-xl bg-black px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
+          >
+            {pending ? "Salvando..." : submitLabel}
           </button>
         </div>
       </div>
+
+      {state.error ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900">
+          {state.error}
+        </div>
+      ) : null}
 
       {product ? <input type="hidden" name="id" value={String(product.id ?? "")} /> : null}
 
       <section className="rounded-2xl border bg-[var(--card)] p-4 shadow-sm">
         <h2 className="mb-4 text-lg font-semibold">Status do cadastro</h2>
         <div className="grid gap-4 md:grid-cols-2">
-        <label className="flex max-w-xs flex-col gap-1 text-sm">
-          <span className="font-medium text-[var(--muted)]">Status</span>
-          <select
-            name="active"
-            defaultValue={String(product?.active ?? 1) === "0" ? "0" : "1"}
-            className="rounded-xl border bg-[var(--card)] px-3 py-2 text-sm outline-none"
-          >
-            <option value="1">ATIVO</option>
-            <option value="0">INATIVO</option>
-          </select>
-        </label>
-        <label className="flex max-w-xs flex-col gap-1 text-sm">
-          <span className="font-medium text-[var(--muted)]">Tipo</span>
-          <select
-            name="kind"
-            defaultValue={String(product?.kind ?? "PRODUTO") || "PRODUTO"}
-            className="rounded-xl border bg-[var(--card)] px-3 py-2 text-sm outline-none"
-          >
-            {PRODUCT_KIND_VALUES.map((kind) => (
-              <option key={kind} value={kind}>
-                {kind}
-              </option>
-            ))}
-          </select>
-        </label>
+          <label className="flex max-w-xs flex-col gap-1 text-sm">
+            <span className="font-medium text-[var(--muted)]">Status</span>
+            <select
+              name="active"
+              defaultValue={String(product?.active ?? 1) === "0" ? "0" : "1"}
+              className="rounded-xl border bg-[var(--card)] px-3 py-2 text-sm outline-none"
+            >
+              <option value="1">ATIVO</option>
+              <option value="0">INATIVO</option>
+            </select>
+          </label>
+          <label className="flex max-w-xs flex-col gap-1 text-sm">
+            <span className="font-medium text-[var(--muted)]">Tipo</span>
+            <select
+              name="kind"
+              defaultValue={String(product?.kind ?? "PRODUTO") || "PRODUTO"}
+              className="rounded-xl border bg-[var(--card)] px-3 py-2 text-sm outline-none"
+            >
+              {PRODUCT_KIND_VALUES.map((kind) => (
+                <option key={kind} value={kind}>
+                  {kind}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
       </section>
 
