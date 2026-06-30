@@ -8,6 +8,7 @@ import { ensureFinancialSchema } from "@/lib/financial-ledger";
 import { ensureOrderPaymentSchema, getOrderPaymentMethodLabel } from "@/lib/payments";
 import { extractLinhaDigitavel, extractNossoNumero } from "@/lib/sicredi-cobranca";
 import { getBoletoWebhookVisualState } from "@/lib/sicredi-webhook";
+import { listCustomers } from "@/lib/queries";
 import { getFiscalDbPool } from "@/fiscal/infra/pg";
 import { getConfiguredFocusAmbiente } from "@/fiscal/providers/focus";
 import {
@@ -15,6 +16,7 @@ import {
   FISCAL_OPERATION_CODE_VENDA_INTERNA,
 } from "@/fiscal/config/operation_options";
 
+import { CustomerSearchClient } from "./customer-search-client";
 import { updateOrderStatusAction } from "./actions";
 import { PedidoBoletoButton } from "./pedido-boleto-button";
 import { PedidoFiscalActions } from "./pedido-fiscal-actions";
@@ -25,6 +27,7 @@ type Row = {
   createdAt: string;
   status: OrderStatus;
   customerName: string;
+  customerTradeName: string | null;
   notes: string | null;
   itemsCount: number;
   totalAmount: number;
@@ -110,6 +113,7 @@ async function listOrders(filters: QueryFilters, limit = 200): Promise<Row[]> {
       o.created_at as createdAt,
       o.status as status,
       c.name as customerName,
+      c.trade_name as customerTradeName,
       o.notes as notes,
       o.payment_method as paymentMethod,
       c.street as customerStreet,
@@ -136,6 +140,7 @@ async function listOrders(filters: QueryFilters, limit = 200): Promise<Row[]> {
     createdAt: string;
     status: string;
     customerName: string;
+    customerTradeName: string | null;
     notes: string | null;
     paymentMethod: string;
     customerStreet: string | null;
@@ -158,6 +163,7 @@ async function listOrders(filters: QueryFilters, limit = 200): Promise<Row[]> {
     createdAt: row.createdAt,
     status: normalizeOrderStatus(row.status) as OrderStatus,
     customerName: row.customerName,
+    customerTradeName: row.customerTradeName,
     notes: row.notes,
     itemsCount: row.itemsCount,
     totalAmount: Number(row.totalAmount ?? 0),
@@ -219,6 +225,7 @@ function matchesOrderQuery(order: Row, query: string) {
   const createdMonth = created ? getSaoPauloYearMonth(created) : "";
   const searchable = [
     order.customerName,
+    order.customerTradeName ?? "",
     order.notes ?? "",
     String(order.id),
     formatOrderCode(order.id),
@@ -239,36 +246,6 @@ function isOrderWithinDateRange(order: Row, from: string, to: string) {
   if (from && iso < from) return false;
   if (to && iso > to) return false;
   return true;
-}
-
-function listOrderSearchSuggestions(limit = 120) {
-  const db = getDb();
-  const rows = db
-    .prepare(
-      `
-      SELECT
-        o.id as id,
-        o.created_at as createdAt,
-        c.name as customerName
-      FROM orders o
-      JOIN customers c ON c.id = o.customer_id
-      ORDER BY o.created_at DESC
-      LIMIT ?
-    `
-    )
-    .all(limit) as Array<{ id: number; createdAt: string; customerName: string }>;
-
-  const suggestions = new Set<string>();
-  for (const row of rows) {
-    suggestions.add(row.customerName);
-    suggestions.add(formatOrderCode(row.id));
-    const created = parseAppDate(row.createdAt);
-    if (created) {
-      suggestions.add(getSaoPauloDateIso(created));
-      suggestions.add(getSaoPauloYearMonth(created));
-    }
-  }
-  return Array.from(suggestions).slice(0, limit);
 }
 
 async function loadFiscalInvoicesByOrderId(orderIds: number[]) {
@@ -539,7 +516,13 @@ export default async function PedidosPage(props: {
     from: "",
     to: "",
   });
-  const suggestions = listOrderSearchSuggestions();
+  const customerSearchOptions = listCustomers({ activeOnly: true, limit: 300 }).map((customer) => ({
+    id: customer.id,
+    name: customer.name,
+    tradeName: customer.tradeName,
+    code: customer.code,
+    cnpj: customer.cnpj,
+  }));
   const summary = summarizeOrders(orders, trendOrders);
   const ambiente = getConfiguredFocusAmbiente();
   const fiscalLabel = ambiente === "producao" ? "P" : "H";
@@ -562,20 +545,21 @@ export default async function PedidosPage(props: {
         </Link>
       </div>
 
-      <form action="/pedidos" method="GET" className="mt-6 rounded-2xl border bg-[var(--card)] p-4 shadow-sm sm:p-5">
+      <form
+        id="pedidos-filter-form"
+        action="/pedidos"
+        method="GET"
+        className="mt-6 rounded-2xl border bg-[var(--card)] p-4 shadow-sm sm:p-5"
+      >
         <div className="grid grid-cols-1 gap-3 2xl:grid-cols-[minmax(260px,1.5fr)_170px_170px_180px_160px_160px_auto]">
-          <input
+          <CustomerSearchClient
+            customers={customerSearchOptions}
+            formId="pedidos-filter-form"
             name="q"
-            list="pedidos-search-suggestions"
             defaultValue={filters.q}
             placeholder="Buscar por cliente, orçamento, mês ou data"
-            className="rounded-xl border bg-[var(--card)] px-4 py-3 text-sm"
+            ariaLabel="Pesquisar orçamentos por cliente"
           />
-          <datalist id="pedidos-search-suggestions">
-            {suggestions.map((suggestion) => (
-              <option key={suggestion} value={suggestion} />
-            ))}
-          </datalist>
           <select
             name="status"
             defaultValue={filters.status}
