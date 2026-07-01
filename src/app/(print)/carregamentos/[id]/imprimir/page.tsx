@@ -123,8 +123,8 @@ export default async function PrintCarregamentoPage({
             </div>
           ) : null}
 
-          <div className="mt-2 overflow-hidden rounded-xl border">
-            <table className="w-full table-fixed text-[10px] leading-tight">
+          <div className="mt-2 inline-block overflow-hidden rounded-xl border">
+            <table className="w-[168mm] table-fixed text-[10px] leading-tight">
               <thead className="bg-black/[0.03] text-left">
                 <tr>
                   <th className="w-[56px] px-2 py-1">Código</th>
