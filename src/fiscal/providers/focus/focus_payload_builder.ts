@@ -2,7 +2,10 @@ import type { FiscalPayloadBuilder, ProductFiscalDataRepository } from "../../en
 import type { FiscalInvoiceDraft, TaxCalculationResult } from "../../engine/types";
 import { FiscalValidationError } from "../../engine/errors";
 import type { FiscalDbClient } from "../../infra/pg";
-import { FISCAL_OPERATION_CODE_BONIFICACAO_5910 } from "../../config/operation_options";
+import {
+  FISCAL_OPERATION_CODE_BONIFICACAO_5910,
+  FISCAL_OPERATION_CODE_ENTREGA_FUTURA_5922,
+} from "../../config/operation_options";
 import { getConfiguredFocusAmbiente } from "./config";
 
 function round2(v: number) {
@@ -99,6 +102,8 @@ export class FocusNFePayloadBuilder implements FiscalPayloadBuilder<Record<strin
         const cofinsRate = fiscalData.aliquotaCofins ?? 0;
         const isBonificacao5910 =
           draft.fiscalOperationCode === FISCAL_OPERATION_CODE_BONIFICACAO_5910 || item.cfop === "5910";
+        const isEntregaFutura5922 =
+          draft.fiscalOperationCode === FISCAL_OPERATION_CODE_ENTREGA_FUTURA_5922 || item.cfop === "5922";
         const shouldIncludeIbscbs =
           !isBonificacao5910 && fiscalData.cstIcms === "00" && fiscalData.cstPis === "01" && fiscalData.cstCofins === "01";
 
@@ -123,7 +128,7 @@ export class FocusNFePayloadBuilder implements FiscalPayloadBuilder<Record<strin
           valor_unitario_tributavel: round2(item.valorUnitario),
 
           icms_origem: fiscalData.origem,
-          icms_situacao_tributaria: isBonificacao5910 ? "90" : fiscalData.cstIcms,
+          icms_situacao_tributaria: isBonificacao5910 || isEntregaFutura5922 ? "90" : fiscalData.cstIcms,
           icms_modalidade_base_calculo: isBonificacao5910 ? undefined : 3,
           icms_base_calculo: isBonificacao5910 ? undefined : round2(totalItem),
           icms_aliquota: isBonificacao5910 ? undefined : round2(icmsRate),
