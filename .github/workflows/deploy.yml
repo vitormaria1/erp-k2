@@ -29,7 +29,9 @@ jobs:
         run: |
           set -euo pipefail
           cd /opt/erp-k2
-          git pull --ff-only
+          git fetch origin main
+          git checkout main
+          git reset --hard origin/main
 
           if [ ! -f .env ]; then
             echo "Warning: /opt/erp-k2/.env not found. The app will start, but fiscal settings will be empty until you add it."
