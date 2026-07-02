@@ -39,7 +39,7 @@ services:
       SICREDI_TIPO_COBRANCA: ${SICREDI_TIPO_COBRANCA:-}
       SICREDI_ESPECIE_DOCUMENTO: ${SICREDI_ESPECIE_DOCUMENTO:-}
     volumes:
-      - ./data:/app/data
+      - ${DATA_DIR:-./data}:/app/data
     ports:
       - "3000:3000"
 

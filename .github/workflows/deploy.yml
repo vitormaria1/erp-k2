@@ -28,24 +28,30 @@ jobs:
           RESET_SQLITE_DB: ${{ github.event_name == 'workflow_dispatch' && inputs.reset_sqlite_db || 'false' }}
         run: |
           set -euo pipefail
-          cd /opt/erp-k2
-          git fetch origin main
-          git checkout main
-          git reset --hard origin/main
+          DEPLOY_DIR=/tmp/erp-k2-deploy
+          REPO_URL="https://github.com/${GITHUB_REPOSITORY}.git"
+          COMPOSE_PROJECT_NAME=erp-k2
 
-          if [ ! -f .env ]; then
+          rm -rf "$DEPLOY_DIR"
+          git clone --depth 1 --branch main "$REPO_URL" "$DEPLOY_DIR"
+          cd "$DEPLOY_DIR"
+
+          if [ ! -f /opt/erp-k2/.env ]; then
             echo "Warning: /opt/erp-k2/.env not found. The app will start, but fiscal settings will be empty until you add it."
           fi
 
           if [ "$RESET_SQLITE_DB" = "true" ]; then
             echo "Resetting production SQLite database after backup..."
-            docker compose down
-            mkdir -p data
-            if [ -f data/erp.db ]; then
-              cp data/erp.db "data/erp.db.backup-$(date +%Y%m%d-%H%M%S)"
+            docker compose --project-name "$COMPOSE_PROJECT_NAME" down
+            mkdir -p /opt/erp-k2/data
+            if [ -f /opt/erp-k2/data/erp.db ]; then
+              cp /opt/erp-k2/data/erp.db "/opt/erp-k2/data/erp.db.backup-$(date +%Y%m%d-%H%M%S)"
             fi
-            rm -f data/erp.db data/erp.db-*
+            rm -f /opt/erp-k2/data/erp.db /opt/erp-k2/data/erp.db-*
           fi
 
-          docker compose up -d --build
+          DATA_DIR=/opt/erp-k2/data docker compose \
+            --project-name "$COMPOSE_PROJECT_NAME" \
+            --env-file /opt/erp-k2/.env \
+            up -d --build --remove-orphans
           docker ps
